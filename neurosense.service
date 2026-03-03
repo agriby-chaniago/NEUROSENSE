@@ -1,0 +1,22 @@
+[Unit]
+Description=NEUROSENSE Sensor Data Collection & Dashboard
+After=network.target
+Wants=network.target
+
+[Service]
+Type=simple
+User=pi
+WorkingDirectory=/home/pi/neurosense
+# Activate the virtual environment before running
+ExecStart=/home/pi/neurosense_env/bin/python /home/pi/neurosense/main.py
+Restart=on-failure
+RestartSec=5s
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=neurosense
+
+# Environment variables (optional — set timezone for correct log timestamps)
+Environment=TZ=Asia/Jakarta
+
+[Install]
+WantedBy=multi-user.target

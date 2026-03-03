@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEUROSENSE Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      :root {
+        --bg: #0d1117;
+        --card-bg: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --yellow: #d29922;
+        --purple: #bc8cff;
+      }
+
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 1.5rem;
+      }
+
+      header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        border-bottom: 1px solid var(--border);
+        padding-bottom: 1rem;
+      }
+      header h1 {
+        font-size: 1.4rem;
+        font-weight: 700;
+        color: var(--accent);
+      }
+      header p {
+        font-size: 0.8rem;
+        color: var(--muted);
+      }
+
+      #status-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--muted);
+        flex-shrink: 0;
+        transition: background 0.4s;
+      }
+      #status-dot.live {
+        background: var(--green);
+        box-shadow: 0 0 6px var(--green);
+      }
+      #status-dot.error {
+        background: var(--red);
+      }
+
+      /* ── Big metric cards ─────────────────────────────── */
+      .metrics-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+      }
+      .metric-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1rem;
+        text-align: center;
+      }
+      .metric-card .label {
+        font-size: 0.72rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      .metric-card .value {
+        font-size: 2rem;
+        font-weight: 700;
+        line-height: 1.2;
+        margin: 0.3rem 0;
+      }
+      .metric-card .unit {
+        font-size: 0.78rem;
+        color: var(--muted);
+      }
+      .metric-card.hr .value {
+        color: var(--red);
+      }
+      .metric-card.spo2 .value {
+        color: var(--accent);
+      }
+      .metric-card.temp .value {
+        color: var(--yellow);
+      }
+      .metric-card.hum .value {
+        color: var(--green);
+      }
+      .metric-card.pres .value {
+        color: var(--purple);
+      }
+      .metric-card.gsr .value {
+        color: #79c0ff;
+      }
+
+      .invalid {
+        opacity: 0.4;
+      }
+
+      /* ── Charts ───────────────────────────────────────── */
+      .charts-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
+        gap: 1.25rem;
+      }
+      .chart-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1rem 1.25rem 1.25rem;
+      }
+      .chart-card h3 {
+        font-size: 0.82rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.75rem;
+      }
+      .chart-card canvas {
+        width: 100% !important;
+      }
+
+      footer {
+        margin-top: 2rem;
+        text-align: center;
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div id="status-dot"></div>
+      <div>
+        <h1>NEUROSENSE</h1>
+        <p id="last-update">Waiting for data…</p>
+      </div>
+    </header>
+
+    <!-- ── Big metric cards ─────────────────────────────── -->
+    <div class="metrics-grid">
+      <div class="metric-card hr">
+        <div class="label">Heart Rate</div>
+        <div class="value" id="val-hr">—</div>
+        <div class="unit">BPM</div>
+      </div>
+      <div class="metric-card spo2">
+        <div class="label">SpO₂</div>
+        <div class="value" id="val-spo2">—</div>
+        <div class="unit">%</div>
+      </div>
+      <div class="metric-card temp">
+        <div class="label">Temperature</div>
+        <div class="value" id="val-temp">—</div>
+        <div class="unit">°C</div>
+      </div>
+      <div class="metric-card hum">
+        <div class="label">Humidity</div>
+        <div class="value" id="val-hum">—</div>
+        <div class="unit">% RH</div>
+      </div>
+      <div class="metric-card pres">
+        <div class="label">Pressure</div>
+        <div class="value" id="val-pres">—</div>
+        <div class="unit">hPa</div>
+      </div>
+      <div class="metric-card gsr">
+        <div class="label">GSR / EDA</div>
+        <div class="value" id="val-gsr">—</div>
+        <div class="unit">µS</div>
+      </div>
+    </div>
+
+    <!-- ── Charts ───────────────────────────────────────── -->
+    <div class="charts-grid">
+      <div class="chart-card">
+        <h3>Heart Rate &amp; SpO₂ (last 60 s)</h3>
+        <canvas id="chart-hr" height="130"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Temperature &amp; Humidity (last 60 s)</h3>
+        <canvas id="chart-env" height="130"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Atmospheric Pressure (last 60 s)</h3>
+        <canvas id="chart-pres" height="130"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>GSR Skin Conductance / EDA (last 60 s)</h3>
+        <canvas id="chart-gsr" height="130"></canvas>
+      </div>
+    </div>
+
+    <footer>
+      NEUROSENSE &mdash; Raspberry Pi 5 &mdash; <span id="footer-ts"></span>
+    </footer>
+
+    <script src="/static/js/dashboard.js"></script>
+  </body>
+</html>

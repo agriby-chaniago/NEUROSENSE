@@ -1,0 +1,10 @@
+data/*.csv
+neurosense.log
+__pycache__/
+*.pyc
+*.pyo
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/

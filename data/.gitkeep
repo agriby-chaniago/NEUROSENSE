@@ -1,0 +1,2 @@
+# This file keeps the data/ directory tracked by git.
+# Actual CSV files are gitignored — they are generated at runtime.
