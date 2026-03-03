@@ -45,18 +45,25 @@ class Buzzer:
     # ── Setup / teardown ──────────────────────────────────────────────────
 
     def setup(self):
-        """Initialise lgpio and configure the buzzer pin as output."""
+        """Initialise lgpio and configure the buzzer pin as output.
+
+        IMPORTANT — Raspberry Pi 5 uses gpiochip4 (not gpiochip0).
+        config.BUZZER_GPIO_CHIP must be set to 4 for Pi 5.
+        """
         if not self._enabled:
             logger.info("Buzzer disabled in config — skipping setup.")
             return
         try:
             import lgpio
-            self._gpio_handle = lgpio.gpiochip_open(0)
-            # Immediately drive LOW — prevents floating HIGH buzz if Pi booted
-            # without gpio=5=op,dl in /boot/firmware/config.txt
+            chip = getattr(config, "BUZZER_GPIO_CHIP", 4)
+            self._gpio_handle = lgpio.gpiochip_open(chip)
+            # Drive LOW immediately — prevents floating HIGH buzz on startup
             lgpio.gpio_claim_output(self._gpio_handle, self._pin, 0)
             lgpio.gpio_write(self._gpio_handle, self._pin, 0)   # explicit LOW
-            logger.info("Buzzer ready on GPIO %d (D5 port, Grove Base HAT)", self._pin)
+            logger.info(
+                "Buzzer ready on GPIO %d via gpiochip%d (D5, Grove Base HAT)",
+                self._pin, chip,
+            )
         except Exception as exc:
             logger.error("Buzzer setup failed: %s", exc)
             self._gpio_handle = None

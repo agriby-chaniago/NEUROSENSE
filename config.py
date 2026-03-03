@@ -72,6 +72,8 @@ DASHBOARD_SSE_INTERVAL_S = 1.0   # How often SSE pushes data to browser
 # D5 port pada Grove Base HAT = GPIO 5 Raspberry Pi
 # Active buzzer: HIGH = berbunyi, LOW = diam
 BUZZER_GPIO_PIN   = 5      # GPIO 5 = D5 port pada Grove Base HAT
+BUZZER_GPIO_CHIP  = 4      # Raspberry Pi 5 menggunakan gpiochip4 (bukan gpiochip0!)
+                           # Pi 4 / Pi 3 gunakan chip 0
 BUZZER_ENABLED    = True
 
 # Durasi bunyi untuk tiap kondisi alert (detik)
