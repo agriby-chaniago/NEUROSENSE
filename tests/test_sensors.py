@@ -61,8 +61,13 @@ class TestFindPeaks:
 
 
 class TestCalcHrAndSpo2:
-    def _synthetic_hr(self, bpm: int = 72, n_samples: int = 100, fs: int = 100) -> list:
-        """Generate a synthetic pulsatile IR signal at a given BPM."""
+    def _synthetic_hr(self, bpm: int = 72, n_samples: int = 300, fs: int = 100) -> list:
+        """
+        Generate a synthetic pulsatile IR signal at a given BPM.
+        n_samples=300 ensures at least 3 full cycles even at low BPM (e.g. 60 BPM
+        = period 100 samples → 3 peaks in 300 samples), satisfying the ≥2 peak
+        requirement in the HR algorithm.
+        """
         import math
         freq = bpm / 60.0
         dc   = 100_000
