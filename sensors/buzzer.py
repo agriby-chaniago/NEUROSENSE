@@ -52,7 +52,10 @@ class Buzzer:
         try:
             import lgpio
             self._gpio_handle = lgpio.gpiochip_open(0)
-            lgpio.gpio_claim_output(self._gpio_handle, self._pin, 0)  # start LOW (off)
+            # Immediately drive LOW — prevents floating HIGH buzz if Pi booted
+            # without gpio=5=op,dl in /boot/firmware/config.txt
+            lgpio.gpio_claim_output(self._gpio_handle, self._pin, 0)
+            lgpio.gpio_write(self._gpio_handle, self._pin, 0)   # explicit LOW
             logger.info("Buzzer ready on GPIO %d (D5 port, Grove Base HAT)", self._pin)
         except Exception as exc:
             logger.error("Buzzer setup failed: %s", exc)

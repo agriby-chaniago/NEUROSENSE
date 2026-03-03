@@ -79,6 +79,10 @@ BUZZER_SHORT_BEEP_S  = 0.1   # 1 beep pendek  → warning ringan
 BUZZER_LONG_BEEP_S   = 0.5   # 1 beep panjang → bahaya
 BUZZER_COOLDOWN_S    = 5.0   # Jeda minimum antara alert (hindari bunyi terus-menerus)
 
+# Test beep saat startup (2 beep pendek untuk konfirmasi buzzer bekerja)
+# Nonaktifkan jika buzzer sudah terbukti berfungsi dan bunyi startup mengganggu
+BUZZER_STARTUP_BEEP  = True
+
 # ─── Alert Thresholds ─────────────────────────────────────────────────────
 # Buzzer akan berbunyi jika nilai sensor melewati batas ini.
 # Set ke None untuk menonaktifkan threshold tertentu.

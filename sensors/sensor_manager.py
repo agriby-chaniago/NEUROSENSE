@@ -78,7 +78,8 @@ class SensorManager:
     def start(self):
         """Calibrate all sensors, setup buzzer, then start reader threads."""
         self._buzzer.setup()
-        self._buzzer.test_beep()   # confirms buzzer wired correctly on startup
+        if config.BUZZER_STARTUP_BEEP:
+            self._buzzer.test_beep()   # 2 beep pendek = konfirmasi buzzer OK
         logger.info("Calibrating all sensors...")
         calibrated = {}
         for name, entry in self._sensors.items():
