@@ -79,4 +79,22 @@ def create_app(sensor_manager) -> Flask:
         """Return a single JSON snapshot of latest sensor readings."""
         return jsonify(_sensor_manager.get_latest())
 
+    @app.route("/recalibrate/<sensor_name>", methods=["POST"])
+    def recalibrate(sensor_name: str):
+        """
+        Trigger runtime recalibration for a sensor.
+        POST /recalibrate/gsr  → retakes GSR baseline (sensor must NOT be worn)
+        """
+        try:
+            result = _sensor_manager.recalibrate_sensor(sensor_name)
+            logger.info("Recalibrated '%s': %s", sensor_name, result)
+            return jsonify({"status": "ok", "sensor": sensor_name, **result})
+        except ValueError as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 404
+        except NotImplementedError as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 400
+        except Exception as exc:
+            logger.error("Recalibrate '%s' failed: %s", sensor_name, exc)
+            return jsonify({"status": "error", "message": str(exc)}), 500
+
     return app

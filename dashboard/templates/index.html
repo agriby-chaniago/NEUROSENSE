@@ -146,6 +146,46 @@
         color: #79c0ff;
       }
 
+      /* ── Recalibrate button ───────────────────────────── */
+      .btn-recal {
+        margin-top: 0.55rem;
+        padding: 0.28rem 0.7rem;
+        font-size: 0.7rem;
+        font-weight: 600;
+        letter-spacing: 0.03em;
+        cursor: pointer;
+        border: 1px solid #30363d;
+        border-radius: 6px;
+        background: #21262d;
+        color: #79c0ff;
+        transition:
+          background 0.2s,
+          border-color 0.2s;
+      }
+      .btn-recal:hover:not(:disabled) {
+        background: #2d333b;
+        border-color: #79c0ff;
+      }
+      .btn-recal:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      #recal-status {
+        font-size: 0.68rem;
+        margin-top: 0.3rem;
+        color: var(--muted);
+        min-height: 1rem;
+      }
+      #recal-status.ok {
+        color: #3fb950;
+      }
+      #recal-status.err {
+        color: #f85149;
+      }
+      #recal-status.busy {
+        color: #d29922;
+      }
+
       .invalid {
         opacity: 0.4;
       }
@@ -227,6 +267,10 @@
         <div class="label">GSR / EDA</div>
         <div class="value" id="val-gsr">—</div>
         <div class="unit">µS</div>
+        <button class="btn-recal" id="btn-recal" onclick="recalibrateGSR()">
+          ⟳ Recalibrate
+        </button>
+        <div id="recal-status"></div>
       </div>
     </div>
 

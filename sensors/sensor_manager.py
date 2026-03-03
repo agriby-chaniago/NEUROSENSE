@@ -179,3 +179,20 @@ class SensorManager:
         """Thread-safe snapshot of the latest aggregated sensor reading."""
         with self._lock:
             return dict(self.latest_data)
+
+    def recalibrate_sensor(self, name: str) -> dict:
+        """
+        Trigger runtime recalibration for a specific sensor by name.
+        Currently supported: 'gsr'
+
+        Returns
+        -------
+        dict with recalibration result info
+        """
+        entry = self._sensors.get(name)
+        if not entry:
+            raise ValueError(f"Sensor '{name}' not registered or not active.")
+        reader = entry["reader"]
+        if not hasattr(reader, "recalibrate_baseline"):
+            raise NotImplementedError(f"Sensor '{name}' does not support runtime recalibration.")
+        return reader.recalibrate_baseline()

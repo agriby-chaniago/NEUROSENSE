@@ -219,3 +219,48 @@ function connect() {
 }
 
 connect();
+
+// ── GSR Recalibration ─────────────────────────────────────────────────────
+async function recalibrateGSR() {
+  const btn = document.getElementById("btn-recal");
+  const status = document.getElementById("recal-status");
+
+  btn.disabled = true;
+  status.className = "busy";
+
+  // Countdown: ask user to release sensor
+  const messages = [
+    "Lepas sensor… 3",
+    "Lepas sensor… 2",
+    "Lepas sensor… 1",
+    "Mengambil baseline…",
+  ];
+  for (const msg of messages) {
+    status.textContent = msg;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+
+  try {
+    const res = await fetch("/recalibrate/gsr", { method: "POST" });
+    const data = await res.json();
+    if (data.status === "ok") {
+      const b10 = data.baseline_10bit ?? "?";
+      const mx = data.max_conductance_us ?? "?";
+      status.className = "ok";
+      status.textContent = `✓ Baseline ${b10} (max ≈ ${mx} µS)`;
+    } else {
+      status.className = "err";
+      status.textContent = "✗ " + (data.message || "error");
+    }
+  } catch (e) {
+    status.className = "err";
+    status.textContent = "✗ Koneksi gagal";
+  }
+
+  btn.disabled = false;
+  // Clear status after 6 s
+  setTimeout(() => {
+    status.textContent = "";
+    status.className = "";
+  }, 6000);
+}

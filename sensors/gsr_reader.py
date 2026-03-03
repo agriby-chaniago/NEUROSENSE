@@ -38,25 +38,51 @@ class GSRReader(BaseSensor):
                 config.GROVE_HAT_ADC_ADDRESS,
                 config.GSR_GROVE_CHANNEL,
             )
-            samples = []
-            for _ in range(_CALIBRATION_SAMPLES):
-                raw = self._adc.read(config.GSR_GROVE_CHANNEL)
-                samples.append(raw)
-                time.sleep(_CALIBRATION_DELAY_S)
-
-            avg_raw = sum(samples) // len(samples)
-            # Normalise to 10-bit (0–1023) for the Seeed formula
-            self._calibration_value = self._to_10bit(avg_raw)
-            logger.info(
-                "GSR calibration complete. Baseline raw=%d  10-bit=%d",
-                avg_raw, self._calibration_value,
-            )
+            self._take_baseline()
             self._last_error = None
 
         except Exception as exc:
             self._last_error = str(exc)
             logger.error("GSR calibrate failed: %s", exc)
             raise
+
+    def recalibrate_baseline(self) -> dict:
+        """
+        Retake the baseline WITHOUT reinitialising the ADC connection.
+        Call this at runtime (e.g. from the dashboard Recalibrate button).
+        The sensor must NOT be worn/touched during the ~1 second this takes.
+
+        Returns
+        -------
+        dict with keys: baseline_raw, baseline_10bit, max_conductance_us
+        """
+        if self._adc is None:
+            raise RuntimeError("GSRReader not initialised; call calibrate() first.")
+        logger.info("GSR: recalibrating baseline — do NOT touch sensor...")
+        self._take_baseline()
+        max_us = round(1_000_000 * self._calibration_value / (1024 * 10_000), 2)
+        result = {
+            "baseline_10bit":      self._calibration_value,
+            "max_conductance_us":  max_us,
+        }
+        logger.info("GSR recalibration done: %s", result)
+        return result
+
+    def _take_baseline(self) -> None:
+        """Collect baseline samples and store the average as calibration value."""
+        samples = []
+        for _ in range(_CALIBRATION_SAMPLES):
+            raw = self._adc.read(config.GSR_GROVE_CHANNEL)
+            samples.append(raw)
+            time.sleep(_CALIBRATION_DELAY_S)
+
+        avg_raw = sum(samples) // len(samples)
+        self._calibration_value = self._to_10bit(avg_raw)
+        max_us = round(1_000_000 * self._calibration_value / (1024 * 10_000), 2)
+        logger.info(
+            "GSR baseline: raw=%d  10-bit=%d  max_conductance=%.2fµS",
+            avg_raw, self._calibration_value, max_us,
+        )
 
     def read(self) -> dict:
         """
