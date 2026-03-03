@@ -16,6 +16,7 @@ from typing import Any
 
 import config
 from logging_module.csv_logger import CSVLogger
+from sensors.buzzer import Buzzer
 
 logger = logging.getLogger(__name__)
 
@@ -31,9 +32,12 @@ class SensorManager:
         self._stop_event = threading.Event()
         self._lock = threading.Lock()
         self._threads: list[threading.Thread] = []
+        self._buzzer = Buzzer()
 
         # Initialised with sentinel Nones — dashboard can detect "not yet read"
         self.latest_data: dict[str, Any] = {k: None for k in config.CSV_FIELDNAMES}
+        self.latest_data["alert_active"]  = False
+        self.latest_data["alert_reasons"] = ""
 
         # Build the sensor registry from ACTIVE_SENSORS config
         self._sensors: dict = {}
@@ -72,15 +76,26 @@ class SensorManager:
     # ── Lifecycle ────────────────────────────────────────────────────────
 
     def start(self):
-        """Calibrate all sensors then start their reader threads."""
+        """Calibrate all sensors, setup buzzer, then start reader threads."""
+        self._buzzer.setup()
+        self._buzzer.test_beep()   # confirms buzzer wired correctly on startup
         logger.info("Calibrating all sensors...")
+        calibrated = {}
         for name, entry in self._sensors.items():
             try:
                 entry["reader"].calibrate()
+                calibrated[name] = entry
             except Exception as exc:
                 logger.error("Sensor '%s' calibration failed — will skip: %s", name, exc)
 
-        for name, entry in self._sensors.items():
+        if not calibrated:
+            logger.warning(
+                "No sensors calibrated successfully. "
+                "Check that I2C is enabled (sudo raspi-config → Interface Options → I2C) "
+                "and all devices are wired correctly, then run: i2cdetect -y 1"
+            )
+
+        for name, entry in calibrated.items():
             t = threading.Thread(
                 target=self._sensor_loop,
                 args=(name, entry["reader"], entry["interval"]),
@@ -102,6 +117,7 @@ class SensorManager:
                 entry["reader"].close()
             except Exception as exc:
                 logger.warning("Error closing sensor '%s': %s", name, exc)
+        self._buzzer.close()
         logger.info("Sensor manager stopped.")
 
     # ── Thread loop ──────────────────────────────────────────────────────
@@ -125,16 +141,23 @@ class SensorManager:
 
     def _update(self, new_data: dict):
         """
-        Merge new_data into latest_data (thread-safe) and push to CSV.
-        Only the keys provided by the sensor are overwritten — other
-        sensor values remain from their last read.
+        Merge new_data into latest_data (thread-safe), evaluate alerts,
+        trigger buzzer if needed, then push to CSV.
         """
         with self._lock:
             now_utc = datetime.now(timezone.utc).isoformat()
-            self.latest_data["timestamp_utc"]   = now_utc
-            self.latest_data["schema_version"]  = config.DATA_SCHEMA_VERSION
+            self.latest_data["timestamp_utc"]  = now_utc
+            self.latest_data["schema_version"] = config.DATA_SCHEMA_VERSION
             self.latest_data.update(new_data)
             snapshot = dict(self.latest_data)
+
+        # Evaluate alerts outside lock (buzzer runs in its own thread)
+        alert_active, alert_reasons = self._buzzer.check_and_alert(snapshot)
+        with self._lock:
+            self.latest_data["alert_active"]  = alert_active
+            self.latest_data["alert_reasons"] = ", ".join(alert_reasons)
+            snapshot["alert_active"]  = alert_active
+            snapshot["alert_reasons"] = ", ".join(alert_reasons)
 
         self._csv_logger.log(snapshot)
 

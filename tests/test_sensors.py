@@ -27,12 +27,12 @@ sys.modules["grove.adc"] = grove_adc
 
 # lgpio
 sys.modules["lgpio"] = MagicMock()
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Now it's safe to import project modules
 import config
 from sensors.hrcalc import calc_hr_and_spo2, _find_peaks
 from sensors.gsr_reader import GSRReader
+from sensors.buzzer import Buzzer
 
 
 # ══ hrcalc tests ═════════════════════════════════════════════════════════════
@@ -158,3 +158,85 @@ class TestCSVLogger:
         content = csv_files[0].read_text(encoding="utf-8")
         assert "timestamp_utc" in content   # header written
         assert "72" in content              # data written
+
+
+# ══ Buzzer alert threshold tests ══════════════════════════════════════════════
+
+class TestBuzzerAlerts:
+    """
+    Test alert evaluation logic only — no GPIO hardware required.
+    The buzzer's _trigger() is patched so no actual beeping occurs.
+    """
+
+    def _make_buzzer(self) -> Buzzer:
+        """Return a Buzzer instance with GPIO disabled (no hardware)."""
+        b = Buzzer()
+        b._gpio_handle = None   # simulate: gpio not initialised
+        return b
+
+    def test_hr_high_triggers_alert(self):
+        b = self._make_buzzer()
+        data = {"heart_rate_bpm": 130, "hr_valid": True,
+                "spo2_percent": 98, "spo2_valid": True,
+                "gsr_conductance_us": 5.0}
+        active, reasons = b.check_and_alert(data)
+        assert active
+        assert any("HR_HIGH" in r for r in reasons)
+
+    def test_hr_low_triggers_alert(self):
+        b = self._make_buzzer()
+        data = {"heart_rate_bpm": 40, "hr_valid": True,
+                "spo2_percent": 98, "spo2_valid": True,
+                "gsr_conductance_us": 5.0}
+        active, reasons = b.check_and_alert(data)
+        assert active
+        assert any("HR_LOW" in r for r in reasons)
+
+    def test_spo2_low_triggers_alert(self):
+        b = self._make_buzzer()
+        data = {"heart_rate_bpm": 75, "hr_valid": True,
+                "spo2_percent": 85, "spo2_valid": True,
+                "gsr_conductance_us": 5.0}
+        active, reasons = b.check_and_alert(data)
+        assert active
+        assert any("SPO2_LOW" in r for r in reasons)
+
+    def test_gsr_high_triggers_alert(self):
+        b = self._make_buzzer()
+        data = {"heart_rate_bpm": 75, "hr_valid": True,
+                "spo2_percent": 98, "spo2_valid": True,
+                "gsr_conductance_us": 25.0}
+        active, reasons = b.check_and_alert(data)
+        assert active
+        assert any("GSR_HIGH" in r for r in reasons)
+
+    def test_normal_values_no_alert(self):
+        b = self._make_buzzer()
+        data = {"heart_rate_bpm": 75, "hr_valid": True,
+                "spo2_percent": 98, "spo2_valid": True,
+                "gsr_conductance_us": 5.0}
+        active, reasons = b.check_and_alert(data)
+        assert not active
+        assert reasons == []
+
+    def test_invalid_hr_not_alerted(self):
+        """HR reading marked invalid (no finger) should not trigger HR alert."""
+        b = self._make_buzzer()
+        data = {"heart_rate_bpm": -999, "hr_valid": False,
+                "spo2_percent": None, "spo2_valid": False,
+                "gsr_conductance_us": 5.0}
+        active, reasons = b.check_and_alert(data)
+        assert not any("HR_" in r for r in reasons)
+
+    def test_cooldown_prevents_double_alert(self):
+        """Second alert within cooldown period should not re-trigger."""
+        b = self._make_buzzer()
+        b._last_alert_time = 9999999.0   # simulate: just alerted
+        data = {"heart_rate_bpm": 130, "hr_valid": True,
+                "spo2_percent": 85, "spo2_valid": True,
+                "gsr_conductance_us": 25.0}
+        # check_and_alert will detect conditions but _trigger should be blocked
+        # We verify by checking _last_alert_time was not reset
+        original_time = b._last_alert_time
+        b.check_and_alert(data)
+        assert b._last_alert_time == original_time   # not updated = cooldown blocked it

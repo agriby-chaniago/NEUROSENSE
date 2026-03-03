@@ -68,6 +68,35 @@
         background: var(--red);
       }
 
+      /* ── Alert banner ─────────────────────────────────── */
+      #alert-banner {
+        display: none;
+        background: rgba(248, 81, 73, 0.12);
+        border: 1px solid var(--red);
+        border-radius: 8px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
+        color: var(--red);
+        font-size: 0.88rem;
+        font-weight: 600;
+        align-items: center;
+        gap: 0.6rem;
+        animation: pulse-border 1s ease-in-out infinite alternate;
+      }
+      #alert-banner.visible {
+        display: flex;
+      }
+      @keyframes pulse-border {
+        from {
+          border-color: var(--red);
+          box-shadow: 0 0 0 rgba(248, 81, 73, 0);
+        }
+        to {
+          border-color: #ff8080;
+          box-shadow: 0 0 8px rgba(248, 81, 73, 0.4);
+        }
+      }
+
       /* ── Big metric cards ─────────────────────────────── */
       .metrics-grid {
         display: grid;
@@ -160,6 +189,12 @@
         <p id="last-update">Waiting for data…</p>
       </div>
     </header>
+
+    <!-- ── Alert banner ───────────────────────────────────── -->
+    <div id="alert-banner">
+      <span style="font-size: 1.1rem">&#9888;</span>
+      <span id="alert-text"></span>
+    </div>
 
     <!-- ── Big metric cards ─────────────────────────────── -->
     <div class="metrics-grid">

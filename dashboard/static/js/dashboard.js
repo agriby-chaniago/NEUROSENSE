@@ -151,6 +151,20 @@ function updateCards(d) {
   setMetric("val-gsr", d.gsr_conductance_us, 4, true);
 }
 
+// ── Alert banner ──────────────────────────────────────
+const alertBanner = document.getElementById("alert-banner");
+const alertText = document.getElementById("alert-text");
+
+function updateAlert(d) {
+  if (d.alert_active) {
+    alertText.textContent =
+      "PERINGATAN: " + (d.alert_reasons || "kondisi bahaya terdeteksi");
+    alertBanner.classList.add("visible");
+  } else {
+    alertBanner.classList.remove("visible");
+  }
+}
+
 // ── SSE connection ────────────────────────────────────────────────────────
 const statusDot = document.getElementById("status-dot");
 const lastUpdate = document.getElementById("last-update");
@@ -188,6 +202,7 @@ function connect() {
 
     // Update metric cards
     updateCards(d);
+    updateAlert(d);
 
     // Update timestamps
     const now = new Date().toLocaleTimeString();

@@ -58,12 +58,40 @@ CSV_FIELDNAMES = [
     "gsr_raw_adc",
     "gsr_resistance_ohm",
     "gsr_conductance_us",  # microSiemens (EDA signal)
+    "alert_active",        # True jika ada kondisi bahaya saat pembacaan ini
+    "alert_reasons",       # deskripsi kondisi bahaya, dipisah koma
 ]
 
 # ─── Dashboard ─────────────────────────────────────────────────────────────
 DASHBOARD_HOST = "0.0.0.0"
 DASHBOARD_PORT = 5000
 DASHBOARD_SSE_INTERVAL_S = 1.0   # How often SSE pushes data to browser
+
+# ─── Grove Buzzer v1.3 ────────────────────────────────────────────────────
+# Wiring: Colok ke port D5 pada Grove Base HAT
+# D5 port pada Grove Base HAT = GPIO 5 Raspberry Pi
+# Active buzzer: HIGH = berbunyi, LOW = diam
+BUZZER_GPIO_PIN   = 5      # GPIO 5 = D5 port pada Grove Base HAT
+BUZZER_ENABLED    = True
+
+# Durasi bunyi untuk tiap kondisi alert (detik)
+BUZZER_SHORT_BEEP_S  = 0.1   # 1 beep pendek  → warning ringan
+BUZZER_LONG_BEEP_S   = 0.5   # 1 beep panjang → bahaya
+BUZZER_COOLDOWN_S    = 5.0   # Jeda minimum antara alert (hindari bunyi terus-menerus)
+
+# ─── Alert Thresholds ─────────────────────────────────────────────────────
+# Buzzer akan berbunyi jika nilai sensor melewati batas ini.
+# Set ke None untuk menonaktifkan threshold tertentu.
+
+# Heart Rate (BPM)
+ALERT_HR_HIGH    = 120   # > 120 BPM → tachycardia warning
+ALERT_HR_LOW     = 45    # < 45 BPM  → bradycardia warning
+
+# SpO2 (%)
+ALERT_SPO2_LOW   = 90    # < 90% → hipoksemia bahaya
+
+# GSR Conductance (µS) — nilai tinggi = stres/arousal tinggi
+ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
