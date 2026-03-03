@@ -49,27 +49,34 @@ class SensorManager:
         """
         Register all sensors that are enabled in config.ACTIVE_SENSORS.
         To add a new sensor: import its reader here, add an entry.
+        Import errors are caught individually — a missing library for one
+        sensor will not prevent the others from starting.
         """
-        if config.ACTIVE_SENSORS.get("bme280"):
-            from sensors.bme280_reader import BME280Reader
-            self._sensors["bme280"] = {
-                "reader":   BME280Reader(),
-                "interval": config.BME280_INTERVAL_S,
-            }
+        candidates = {
+            "bme280":   ("sensors.bme280_reader",   "BME280Reader",   config.BME280_INTERVAL_S),
+            "max30102": ("sensors.max30102_reader",  "MAX30102Reader", config.MAX30102_INTERVAL_S),
+            "gsr":      ("sensors.gsr_reader",       "GSRReader",      config.GSR_INTERVAL_S),
+        }
 
-        if config.ACTIVE_SENSORS.get("max30102"):
-            from sensors.max30102_reader import MAX30102Reader
-            self._sensors["max30102"] = {
-                "reader":   MAX30102Reader(),
-                "interval": config.MAX30102_INTERVAL_S,
-            }
-
-        if config.ACTIVE_SENSORS.get("gsr"):
-            from sensors.gsr_reader import GSRReader
-            self._sensors["gsr"] = {
-                "reader":   GSRReader(),
-                "interval": config.GSR_INTERVAL_S,
-            }
+        for name, (module_path, class_name, interval) in candidates.items():
+            if not config.ACTIVE_SENSORS.get(name):
+                continue
+            try:
+                import importlib
+                module = importlib.import_module(module_path)
+                reader_class = getattr(module, class_name)
+                self._sensors[name] = {
+                    "reader":   reader_class(),
+                    "interval": interval,
+                }
+            except ImportError as exc:
+                logger.error(
+                    "Sensor '%s' skipped — missing library: %s. "
+                    "Run: pip install -r requirements.txt",
+                    name, exc,
+                )
+            except Exception as exc:
+                logger.error("Sensor '%s' failed to load: %s", name, exc)
 
         logger.info("Registered sensors: %s", list(self._sensors.keys()))
 
