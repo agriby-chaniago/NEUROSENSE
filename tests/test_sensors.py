@@ -193,7 +193,7 @@ class TestBuzzerAlerts:
     def test_spo2_low_triggers_alert(self):
         b = self._make_buzzer()
         data = {"heart_rate_bpm": 75, "hr_valid": True,
-                "spo2_percent": 85, "spo2_valid": True,
+                "spo2_percent": 82, "spo2_valid": True,  # 82 < 85 threshold
                 "gsr_conductance_us": 5.0}
         active, reasons = b.check_and_alert(data)
         assert active

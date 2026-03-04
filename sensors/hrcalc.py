@@ -77,6 +77,18 @@ def calc_hr_and_spo2(
     ir_ac  = ir  - ir_mean
     red_ac = red - red_mean
 
+    # ── Motion-artifact guard ───────────────────────────────────────────────
+    #    If the AC RMS is > 15 % of DC the buffer is dominated by movement,
+    #    not pulsatile flow (placement/removal shows PI 20-160 %, motion ~10 %).
+    #    Normal PPG: AC RMS / DC ≈ 0.04 – 5 %.
+    ac_rms_ratio = float(np.std(ir_ac)) / (ir_mean + 1e-9)
+    if ac_rms_ratio > 0.15:
+        _log.warning(
+            "MAX30102 motion artifact: AC_RMS/DC=%.1f%% (need ≤15%%), skipping buffer",
+            ac_rms_ratio * 100,
+        )
+        return -999.0, False, -999.0, False
+
     # ── 2. HR via autocorrelation ───────────────────────────────────────────
     #    Search lag range: 0.4 s–1.5 s → 40–150 BPM at 100 Hz
     #    (lag_min = 100/150*60 = 40 samples → 150 BPM max)
@@ -99,17 +111,19 @@ def calc_hr_and_spo2(
     best_lag = best_idx + lag_min
     best_corr = float(search[best_idx])
 
-    # ── Harmonic check ───────────────────────────────────────────────────────
-    #    The dicrotic notch can make autocorr peak at T/2 (double HR).
-    #    If the true period is T = 2*best_lag and corr[2*best_lag] >= 0.2
-    #    of best_corr, prefer the doubled lag (lower / correct HR).
-    #    Guard: doubled_lag <= lag_max ensures we only double into a valid HR
-    #    range, preventing a correct lag from being doubled unnecessarily.
-    #    Since lag_max is now n*3//4, this covers the full 40-150 BPM range.
+    # ── Boundary + harmonic guard ─────────────────────────────────────────────
+    #    If best_lag == lag_min (= 40, i.e. 150 BPM), the argmax hit the lower
+    #    edge of the search window. This almost never reflects a real heart rate;
+    #    it means the periodic component is at a sub-40-sample period (motion)
+    #    or the signal is featureless and the boundary has the highest corr.
+    #    Require very high confidence (≥ 0.55) before accepting such a result.
+    if best_lag == lag_min and best_corr < 0.55:
+        return -999.0, False, -999.0, False
+
     doubled_lag = best_lag * 2
     if doubled_lag <= lag_max:
         doubled_corr = float(autocorr[doubled_lag])
-        if doubled_corr >= 0.2 * best_corr:
+        if doubled_corr >= 0.10 * best_corr:   # 0.20 → 0.10: catch weaker T/2 harmonics
             best_lag  = doubled_lag
             best_corr = doubled_corr
 
@@ -118,8 +132,8 @@ def calc_hr_and_spo2(
         best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
     )
 
-    # Require at least 0.08 correlation — pure noise gives ~0.0
-    if best_corr < 0.08:
+    # Require at least 0.20 correlation — noisy/transitional reads sit at 0.08-0.19
+    if best_corr < 0.20:
         return -999.0, False, -999.0, False
 
     hr_bpm   = (sampling_freq / best_lag) * 60.0

@@ -132,7 +132,9 @@ ALERT_HR_HIGH    = 120   # > 120 BPM → tachycardia warning
 ALERT_HR_LOW     = 45    # < 45 BPM  → bradycardia warning
 
 # SpO2 (%)
-ALERT_SPO2_LOW   = 90    # < 90% → hipoksemia bahaya
+# Sensor MAX30102 memberikan pembacaan ~4-6% lebih rendah dari nilai sebenarnya
+# (offset kalibrasi). Gunakan 85% sebagai threshold bahaya nyata, bukan 90%.
+ALERT_SPO2_LOW   = 85    # < 85% → hipoksemia berbahaya (kalibrasi offset ~5%)
 
 # GSR Conductance (µS) — nilai tinggi = stres/arousal tinggi
 ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
