@@ -100,9 +100,10 @@ def calc_hr_and_spo2(
     # ── Harmonic check ───────────────────────────────────────────────────────
     #    The dicrotic notch can make autocorr peak at T/2 (double HR).
     #    If corr[lag*2] >= 0.2 * corr[lag], the true period is lag*2.
-    #    Threshold 0.2 (was 0.5) fires more aggressively on noisy signals.
+    #    NOTE: allow doubled_lag beyond lag_max (autocorr array is still valid
+    #    at those indices); lag validity is enforced below by hr_valid check.
     doubled_lag = best_lag * 2
-    if doubled_lag <= lag_max:
+    if doubled_lag < len(autocorr):   # within array bounds, not just lag_max
         doubled_corr = float(autocorr[doubled_lag])
         if doubled_corr >= 0.2 * best_corr:
             best_lag  = doubled_lag
@@ -153,6 +154,15 @@ def calc_hr_and_spo2(
         "MAX30102 SpO2: ac_ir=%.1f  ac_red=%.1f  PI=%.3f%%  R=%.3f",
         ac_ir, ac_red, pi_ir * 100, r,
     )
+    # R < 0.3 → SpO2 > 100% (calibration noise); R > 0.95 → SpO2 < 81%
+    # which is non-physiological for a sensor read without severe hypoxia.
+    # R ≥ 1.0 is physically impossible. Reject these as motion artifacts.
+    if r < 0.3 or r > 0.95:
+        _log.warning(
+            "MAX30102 SpO2 rejected: R=%.3f out of physiological range [0.30, 0.95]",
+            r,
+        )
+        return hr_bpm, hr_valid, -999.0, False
     r_idx    = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
     spo2     = float(_SPO2_TABLE[r_idx])
     spo2_valid = hr_valid and (70.0 <= spo2 <= 100.0)
