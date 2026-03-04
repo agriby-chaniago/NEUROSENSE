@@ -183,10 +183,11 @@ def calc_hr_and_spo2(
     ac_red = 2.0 * float(np.abs(red_fft[k])) / n
 
     # Minimum absolute AC signal gate.
-    # When the DFT bin amplitude is tiny (<50 counts), spectral noise from
-    # breathing or quantisation dominates R — producing R values of 0.1 or 4+.
-    # Both channels must have a meaningful pulsatile component.
-    if ac_ir < 50.0 or ac_red < 10.0:
+    # Threshold lowered to 25 IR / 8 red counts — at PI≈0.02% with ir_mean≈130000
+    # ac_ir sits at ~55–80 and fluctuates ±15 counts; a gate of 50 caused >80% of
+    # reads to be rejected.  The EMA smooths the noisier low-PI readings.
+    # Below 25 counts the DFT is dominated by quantisation noise (~±5 counts).
+    if ac_ir < 25.0 or ac_red < 8.0:
         _log.debug(
             "MAX30102 SpO2 rejected: ac signals too small (ac_ir=%.1f, ac_red=%.1f)",
             ac_ir, ac_red,
