@@ -76,28 +76,37 @@ def calc_hr_and_spo2(
     red_ac = red - red_mean
 
     # ── 2. HR via autocorrelation ───────────────────────────────────────────
-    #    Autocorrelation finds the dominant period of the PPG signal directly.
-    #    It is completely immune to the dicrotic notch because it averages
-    #    over all cycles and only cares about periodicity, not peak shape.
-    #
-    #    Search lag range: 0.33 s–1.5 s → 40–180 BPM at 100 Hz
-    lag_min = int(sampling_freq * 0.33)   # 33 samples → 182 BPM max
-    lag_max = int(sampling_freq * 1.5)    # 150 samples → 40 BPM min
+    #    Search lag range: 0.4 s–1.5 s → 40–150 BPM at 100 Hz
+    #    (lag_min = 100/150*60 = 40 samples → 150 BPM max)
+    lag_min = int(round(sampling_freq * 60.0 / 150))  # 40 samples
+    lag_max = int(round(sampling_freq * 60.0 / 40))   # 150 samples
     lag_max = min(lag_max, n // 2)
+
+    if lag_min >= lag_max:
+        return -999.0, False, -999.0, False
 
     # Normalised autocorrelation
     autocorr = np.correlate(ir_ac, ir_ac, mode='full')
     autocorr = autocorr[n - 1:]          # keep lags 0, 1, 2, …
     autocorr /= (autocorr[0] + 1e-9)     # normalise to 1.0 at lag=0
 
-    # Find the largest peak in the valid lag range
-    search = autocorr[lag_min:lag_max + 1]
-    if search.size == 0:
+    search   = autocorr[lag_min:lag_max + 1]
+    best_idx = int(np.argmax(search))
+    best_lag = best_idx + lag_min
+    best_corr = float(search[best_idx])
+
+    import logging as _log
+    _log.getLogger(__name__).info(
+        "MAX30102 autocorr: best_lag=%d  corr=%.3f  → %.1f BPM",
+        best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
+    )
+
+    # Require at least 0.3 correlation — pure noise gives ~0.0
+    if best_corr < 0.3:
         return -999.0, False, -999.0, False
 
-    best_lag = int(np.argmax(search)) + lag_min
     hr_bpm   = (sampling_freq / best_lag) * 60.0
-    hr_valid = 30 <= hr_bpm <= 180
+    hr_valid = 40 <= hr_bpm <= 150
 
     # ── 3. SpO2 via RMS ratio-of-ratios ────────────────────────────────────
     #    R = (RMS_red / DC_red) / (RMS_ir / DC_ir)
