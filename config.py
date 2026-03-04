@@ -153,7 +153,7 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 #
 # To verify CSI: libcamera-hello --list-cameras
 # To verify USB: ls /dev/video*
-CAMERA_ENABLED       = True
+CAMERA_ENABLED       = False
 CAMERA_WIDTH         = 640    # capture width in pixels
 CAMERA_HEIGHT        = 480    # capture height in pixels
 CAMERA_FRAMERATE     = 15     # fps — lower = less CPU and bandwidth
