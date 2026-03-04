@@ -6,6 +6,16 @@ grove.py==0.6.0
 numpy==1.26.4
 flask==3.1.0
 lgpio==0.2.2.0
+Pillow>=10.0.0          # required for Arducam/picamera2 JPEG encoding
+
+# Arducam / camera dependencies (install the one matching your hardware):
+#   CSI ribbon cable (recommended):
+#     sudo apt install -y python3-picamera2
+#   USB Arducam fallback:
+#     pip install opencv-python-headless
+# picamera2 is not listed here — install via apt on Raspberry Pi OS.
+# Uncomment to install OpenCV fallback in venv:
+# opencv-python-headless==4.9.0.80
 
 # Development / testing only
 pytest==8.3.4

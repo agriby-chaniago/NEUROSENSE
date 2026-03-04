@@ -222,6 +222,43 @@
         font-size: 0.72rem;
         color: var(--muted);
       }
+
+      /* ── Camera feed ───────────────────────────────── */
+      .camera-card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 10px;
+        padding: 1rem 1.25rem 1.25rem;
+        margin-bottom: 1.5rem;
+      }
+      .camera-card h3 {
+        font-size: 0.82rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        margin-bottom: 0.75rem;
+      }
+      .camera-card .camera-inner {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      #camera-feed {
+        width: 100%;
+        max-width: 640px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: #000;
+        display: block;
+      }
+      #camera-status {
+        font-size: 0.72rem;
+        color: var(--muted);
+      }
+      #camera-status.error {
+        color: var(--red);
+      }
     </style>
   </head>
   <body>
@@ -276,7 +313,20 @@
         <div id="recal-status"></div>
       </div>
     </div>
-
+    <!-- ── Camera feed ───────────────────────────────────── -->
+    <div class="camera-card" id="camera-section">
+      <h3>&#127909; Arducam Live Feed</h3>
+      <div class="camera-inner">
+        <img
+          id="camera-feed"
+          src="/camera/stream"
+          alt="Camera stream"
+          onerror="onCameraError()"
+          onload="onCameraLoad()"
+        />
+        <div id="camera-status">Connecting…</div>
+      </div>
+    </div>
     <!-- ── Charts ───────────────────────────────────────── -->
     <div class="charts-grid">
       <div class="chart-card">

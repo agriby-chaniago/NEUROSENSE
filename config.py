@@ -146,6 +146,21 @@ ALERT_SPO2_LOW   = 85    # < 85% → hipoksemia berbahaya (kalibrasi offset ~5%)
 # GSR Conductance (µS) — nilai tinggi = stres/arousal tinggi
 ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 
+# ─── Arducam / Raspberry Pi Camera ──────────────────────────────────────────
+# Wiring:
+#   CSI ribbon cable (Arducam CSI) → uses picamera2 automatically   (recommended)
+#   USB Arducam → falls back to OpenCV VideoCapture (CAMERA_DEVICE_INDEX)
+#
+# To verify CSI: libcamera-hello --list-cameras
+# To verify USB: ls /dev/video*
+CAMERA_ENABLED       = True
+CAMERA_WIDTH         = 640    # capture width in pixels
+CAMERA_HEIGHT        = 480    # capture height in pixels
+CAMERA_FRAMERATE     = 15     # fps — lower = less CPU and bandwidth
+CAMERA_JPEG_QUALITY  = 75     # JPEG quality 1–95 (75 = good balance size/quality)
+CAMERA_ROTATION      = 0      # clockwise degrees: 0 / 90 / 180 / 270
+CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
+
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
 # sensor_manager reads this dict — adding a new sensor only needs a new key here

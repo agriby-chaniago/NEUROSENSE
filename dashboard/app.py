@@ -12,17 +12,19 @@ GET /snapshot   → JSON single latest reading (useful for debugging)
 import json
 import logging
 import time
+from typing import Optional
 from flask import Flask, Response, jsonify, render_template, stream_with_context
 
 import config
 
 logger = logging.getLogger(__name__)
 
-# sensor_manager is injected by main.py after startup
+# Injected by main.py after startup
 _sensor_manager = None
+_camera_reader: Optional[object] = None
 
 
-def create_app(sensor_manager) -> Flask:
+def create_app(sensor_manager, camera_reader=None) -> Flask:
     """
     Factory function — creates and configures the Flask app.
 
@@ -31,8 +33,9 @@ def create_app(sensor_manager) -> Flask:
     sensor_manager : SensorManager
         Already-started SensorManager instance.
     """
-    global _sensor_manager
+    global _sensor_manager, _camera_reader
     _sensor_manager = sensor_manager
+    _camera_reader  = camera_reader
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = "neurosense-dev-key"
@@ -69,10 +72,49 @@ def create_app(sensor_manager) -> Flask:
     @app.route("/health")
     def health():
         """JSON health check — shows per-sensor status."""
-        return jsonify({
-            "status": "ok",
-            "sensors": _sensor_manager.health(),
-        })
+        sensors = _sensor_manager.health()
+        if _camera_reader is not None:
+            sensors.append(_camera_reader.health())
+        return jsonify({"status": "ok", "sensors": sensors})
+
+    @app.route("/camera/stream")
+    def camera_stream():
+        """
+        MJPEG multipart stream — point an <img> src here for live video.
+        Falls back to a 503 if the camera is not enabled/available.
+        """
+        if _camera_reader is None:
+            return Response("Camera not enabled", status=503)
+
+        def generate():
+            boundary = b"--frame"
+            while True:
+                frame = _camera_reader.get_frame()
+                if frame:
+                    yield (
+                        boundary + b"\r\n"
+                        b"Content-Type: image/jpeg\r\n"
+                        b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
+                        b"\r\n" + frame + b"\r\n"
+                    )
+                time.sleep(1.0 / max(1, config.CAMERA_FRAMERATE))
+
+        return Response(
+            stream_with_context(generate()),
+            mimetype="multipart/x-mixed-replace; boundary=frame",
+            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+        )
+
+    @app.route("/camera/snapshot")
+    def camera_snapshot():
+        """Return the latest JPEG frame as a single image (useful for diagnostics)."""
+        if _camera_reader is None:
+            return Response("Camera not enabled", status=503)
+        frame = _camera_reader.get_frame()
+        if frame is None:
+            return Response("No frame yet", status=503)
+        return Response(frame, mimetype="image/jpeg",
+                        headers={"Cache-Control": "no-cache"})
 
     @app.route("/snapshot")
     def snapshot():

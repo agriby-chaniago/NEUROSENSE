@@ -60,17 +60,31 @@ def main():
     sensor_manager = SensorManager(csv_logger=csv_logger)
     sensor_manager.start()
 
-    # ── Give sensors a moment to get first readings ───────────────────────
+    # ── Start camera ───────────────────────────────────────────────────
+    camera_reader = None
+    if config.CAMERA_ENABLED:
+        try:
+            from sensors.camera_reader import CameraReader
+            camera_reader = CameraReader()
+            camera_reader.start()
+            logger.info("CameraReader started")
+        except Exception as exc:
+            logger.error("Camera failed to start — continuing without camera: %s", exc)
+            camera_reader = None
+
+    # ── Give sensors a moment to get first readings ────────────────────
     time.sleep(2)
 
-    # ── Create Flask app ─────────────────────────────────────────────────
-    app = create_app(sensor_manager)
+    # ── Create Flask app ────────────────────────────────────────────────
+    app = create_app(sensor_manager, camera_reader=camera_reader)
 
     # ── Graceful shutdown on Ctrl+C / SIGTERM ────────────────────────────
     def shutdown(signum, frame):
         logger.info("Shutdown signal received (%s).", signal.Signals(signum).name)
         sensor_manager.stop()
         csv_logger.stop()
+        if camera_reader is not None:
+            camera_reader.stop()
         logger.info("NEUROSENSE stopped cleanly.")
         sys.exit(0)
 
