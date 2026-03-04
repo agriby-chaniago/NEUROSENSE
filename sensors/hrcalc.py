@@ -120,29 +120,28 @@ def calc_hr_and_spo2(
     hr_bpm   = (sampling_freq / best_lag) * 60.0
     hr_valid = 40 <= hr_bpm <= 150
 
-    # ── 3. SpO2 via RMS ratio-of-ratios on bandpass-filtered signal ─────────
-    #    RMS of raw ir_ac / red_ac is noise-dominated → R biased high → SpO2 low.
-    #    Lowpass with a 25-pt MA (cutoff ~2 Hz at 100 Hz) extracts only the
-    #    pulsatile cardiac component before computing RMS.
-    bp_kernel = np.ones(25) / 25.0
-    ir_bp  = np.convolve(ir_ac,  bp_kernel, mode='same')
-    red_bp = np.convolve(red_ac, bp_kernel, mode='same')
-
-    # Trim edge artefacts introduced by convolution
-    trim   = 25
-    ir_bp  = ir_bp[trim:-trim]
-    red_bp = red_bp[trim:-trim]
-
-    rms_ir  = float(np.sqrt(np.mean(ir_bp  ** 2)))
-    rms_red = float(np.sqrt(np.mean(red_bp ** 2)))
-
-    if rms_ir < 1.0 or red_mean < 1.0:
+    # ── 3. SpO2 via DFT amplitude at cardiac frequency ─────────────────────
+    #    We already know the cardiac period = best_lag samples.
+    #    Evaluate the DFT at exactly that frequency bin — this extracts ONLY
+    #    the pulsatile cardiac component and rejects everything else
+    #    (dicrotic notch at 2×, motion at other frequencies, wideband noise).
+    k = int(round(n / best_lag))   # DFT bin of cardiac fundamental
+    if k < 1 or k >= n // 2:
         return hr_bpm, hr_valid, -999.0, False
 
-    r = (rms_red / red_mean) / (rms_ir / ir_mean)
+    ir_fft  = np.fft.rfft(ir_ac)
+    red_fft = np.fft.rfft(red_ac)
+
+    ac_ir  = 2.0 * float(np.abs(ir_fft[k]))  / n
+    ac_red = 2.0 * float(np.abs(red_fft[k])) / n
+
+    if ac_ir < 1.0 or red_mean < 1.0:
+        return hr_bpm, hr_valid, -999.0, False
+
+    r = (ac_red / red_mean) / (ac_ir / ir_mean)
     _log.info(
-        "MAX30102 SpO2: rms_ir=%.1f  rms_red=%.1f  R=%.3f",
-        rms_ir, rms_red, r,
+        "MAX30102 SpO2: ac_ir=%.1f  ac_red=%.1f  R=%.3f",
+        ac_ir, ac_red, r,
     )
     r_idx    = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
     spo2     = float(_SPO2_TABLE[r_idx])
