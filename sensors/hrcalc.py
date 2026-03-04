@@ -4,6 +4,9 @@ Port of Maxim Integrated's reference algorithm (originally in C/Arduino).
 """
 
 import numpy as np
+import logging
+
+_log = logging.getLogger(__name__)
 
 
 # ── SpO2 lookup table (Maxim reference Table 2) ──────────────────────────────
@@ -66,8 +69,7 @@ def calc_hr_and_spo2(
 
     if ir_mean < 5000:
         # No finger on sensor (or finger not properly placed)
-        import logging as _log
-        _log.getLogger(__name__).warning(
+        _log.warning(
             "MAX30102: no finger / weak signal (ir_mean=%.0f, need >5000)", ir_mean
         )
         return -999.0, False, -999.0, False
@@ -97,16 +99,16 @@ def calc_hr_and_spo2(
 
     # ── Harmonic check ───────────────────────────────────────────────────────
     #    The dicrotic notch can make autocorr peak at T/2 (double HR).
-    #    If corr[lag*2] >= 0.5 * corr[lag], the true period is lag*2.
+    #    If corr[lag*2] >= 0.2 * corr[lag], the true period is lag*2.
+    #    Threshold 0.2 (was 0.5) fires more aggressively on noisy signals.
     doubled_lag = best_lag * 2
     if doubled_lag <= lag_max:
         doubled_corr = float(autocorr[doubled_lag])
-        if doubled_corr >= 0.5 * best_corr:
+        if doubled_corr >= 0.2 * best_corr:
             best_lag  = doubled_lag
             best_corr = doubled_corr
 
-    import logging as _log
-    _log.getLogger(__name__).info(
+    _log.info(
         "MAX30102 autocorr: best_lag=%d  corr=%.3f  → %.1f BPM",
         best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
     )
@@ -118,17 +120,30 @@ def calc_hr_and_spo2(
     hr_bpm   = (sampling_freq / best_lag) * 60.0
     hr_valid = 40 <= hr_bpm <= 150
 
-    # ── 3. SpO2 via RMS ratio-of-ratios ────────────────────────────────────
-    #    R = (RMS_red / DC_red) / (RMS_ir / DC_ir)
-    #    RMS of the AC signal is more stable than peak-to-trough over short
-    #    windows and is unaffected by the dicrotic notch.
-    rms_ir  = float(np.sqrt(np.mean(ir_ac  ** 2)))
-    rms_red = float(np.sqrt(np.mean(red_ac ** 2)))
+    # ── 3. SpO2 via RMS ratio-of-ratios on bandpass-filtered signal ─────────
+    #    RMS of raw ir_ac / red_ac is noise-dominated → R biased high → SpO2 low.
+    #    Lowpass with a 25-pt MA (cutoff ~2 Hz at 100 Hz) extracts only the
+    #    pulsatile cardiac component before computing RMS.
+    bp_kernel = np.ones(25) / 25.0
+    ir_bp  = np.convolve(ir_ac,  bp_kernel, mode='same')
+    red_bp = np.convolve(red_ac, bp_kernel, mode='same')
+
+    # Trim edge artefacts introduced by convolution
+    trim   = 25
+    ir_bp  = ir_bp[trim:-trim]
+    red_bp = red_bp[trim:-trim]
+
+    rms_ir  = float(np.sqrt(np.mean(ir_bp  ** 2)))
+    rms_red = float(np.sqrt(np.mean(red_bp ** 2)))
 
     if rms_ir < 1.0 or red_mean < 1.0:
         return hr_bpm, hr_valid, -999.0, False
 
     r = (rms_red / red_mean) / (rms_ir / ir_mean)
+    _log.info(
+        "MAX30102 SpO2: rms_ir=%.1f  rms_red=%.1f  R=%.3f",
+        rms_ir, rms_red, r,
+    )
     r_idx    = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
     spo2     = float(_SPO2_TABLE[r_idx])
     spo2_valid = hr_valid and (70.0 <= spo2 <= 100.0)
