@@ -124,12 +124,11 @@ def calc_hr_and_spo2(
     best_corr = float(search[best_idx])
 
     # ── Boundary + harmonic guard ─────────────────────────────────────────────
-    #    If best_lag == lag_min (= 40, i.e. 150 BPM), the argmax hit the lower
-    #    edge of the search window. This almost never reflects a real heart rate;
-    #    it means the periodic component is at a sub-40-sample period (motion)
-    #    or the signal is featureless and the boundary has the highest corr.
-    #    Require very high confidence (≥ 0.55) before accepting such a result.
-    if best_lag == lag_min and best_corr < 0.55:
+    #    If best_lag hit either search boundary the argmax found no real peak
+    #    inside the window.  Require very high confidence before accepting:
+    #      lag == lag_min → reported HR 150 BPM (virtually never true at rest)
+    #      lag == lag_max → reported HR 40 BPM (extremely slow / touching edge)
+    if (best_lag == lag_min or best_lag == lag_max) and best_corr < 0.55:
         return -999.0, False, -999.0, False
 
     doubled_lag = best_lag * 2
