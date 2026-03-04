@@ -7,7 +7,7 @@ Change sensor wiring? Update this file only.
 # ─── I2C Bus ───────────────────────────────────────────────────────────────
 I2C_BUS = 1   # /dev/i2c-1 (Raspberry Pi standard bus)
 
-# ─── BMP280 (temperature + pressure, NO humidity) ────────────────────────
+# ─── BME280 (temperature + pressure + humidity) ──────────────────────────
 # Wiring:
 #   VCC → 3.3V (Pin 1)    GND → GND (Pin 6)
 #   SDA → GPIO2 (Pin 3)   SCL → GPIO3 (Pin 5)
@@ -75,7 +75,7 @@ DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # CSV columns — order matters for readability
 # Bump DATA_SCHEMA_VERSION when this list changes (e.g. "1.1.0").
-# humidity_percent removed: BMP280 does not have a humidity sensor.
+# humidity_percent: populated by BME280; None/empty for BMP280.
 DATA_SCHEMA_VERSION = "1.1.0"
 
 CSV_FIELDNAMES = [
