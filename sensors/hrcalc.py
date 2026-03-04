@@ -166,9 +166,25 @@ def calc_hr_and_spo2(
     if best_lag == lag_max and best_corr < 0.55:
         return -999.0, False, -999.0, False
 
+    # ── Parabolic interpolation for sub-sample lag precision ─────────────────
+    #    Quadratic fit around the argmax gives a fractional lag offset δ:
+    #      δ = (α - γ) / (2(α - 2β + γ))   where α=R[k-1], β=R[k], γ=R[k+1]
+    #    At 86 BPM true: integer argmax alternates 17/18/19 → 83–88 BPM jitter.
+    #    With interpolation: lag≈17.44 → 86.0 BPM stable.
+    #    Clamped to ±0.5 so the result never crosses into the adjacent integer bin.
+    lag_float = float(best_lag)
+    if lag_min < best_lag < len(autocorr) - 1:
+        alpha = float(autocorr[best_lag - 1])
+        beta  = float(autocorr[best_lag])
+        gamma = float(autocorr[best_lag + 1])
+        denom = alpha - 2.0 * beta + gamma
+        if abs(denom) > 1e-9:
+            delta = 0.5 * (alpha - gamma) / denom
+            lag_float = best_lag + max(-0.5, min(0.5, delta))
+
     _log.info(
-        "MAX30102 autocorr: best_lag=%d  corr=%.3f  → %.1f BPM",
-        best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
+        "MAX30102 autocorr: best_lag=%d (%.2f)  corr=%.3f  → %.1f BPM",
+        best_lag, lag_float, best_corr, (sampling_freq / lag_float) * 60.0,
     )
 
     # Require at least 0.10 correlation after detrend+window.
@@ -177,7 +193,7 @@ def calc_hr_and_spo2(
     if best_corr < 0.10:
         return -999.0, False, -999.0, False
 
-    hr_bpm   = (sampling_freq / best_lag) * 60.0
+    hr_bpm   = (sampling_freq / lag_float) * 60.0
     hr_valid = 40 <= hr_bpm <= 150
 
     # ── 3. SpO2 via DFT amplitude at cardiac frequency ─────────────────────
@@ -185,7 +201,7 @@ def calc_hr_and_spo2(
     #    Evaluate the DFT at exactly that frequency bin — this extracts ONLY
     #    the pulsatile cardiac component and rejects everything else
     #    (dicrotic notch at 2×, motion at other frequencies, wideband noise).
-    k = int(round(n / best_lag))   # DFT bin of cardiac fundamental
+    k = int(round(n / lag_float))   # DFT bin of cardiac fundamental
     if k < 1 or k >= n // 2:
         return hr_bpm, hr_valid, -999.0, False
 

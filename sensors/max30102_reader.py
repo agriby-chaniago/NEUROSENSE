@@ -106,10 +106,10 @@ class MAX30102Reader(BaseSensor):
             import numpy as _np  # local import, lightweight
 
             # Not enough samples yet to calculate
-            if len(self._ring_ir) < config.MAX30102_SAMPLE_BUFFER:
+            if len(self._ring_ir) < config.MAX30102_MIN_SAMPLES:
                 logger.debug(
                     "MAX30102 ring buffer filling: %d/%d samples",
-                    len(self._ring_ir), config.MAX30102_SAMPLE_BUFFER,
+                    len(self._ring_ir), config.MAX30102_MIN_SAMPLES,
                 )
                 return {
                     "heart_rate_bpm": None, "spo2_percent": None,
@@ -120,8 +120,12 @@ class MAX30102Reader(BaseSensor):
             red_data = list(self._ring_red)
 
             ir_mean_now = float(_np.mean(ir_data))
+            # Suppress drift guard while buffer is still warming up — DC naturally
+            # changes as more samples accumulate before the buffer is full.
+            buffer_full = len(self._ring_ir) >= config.MAX30102_SAMPLE_BUFFER
             ir_drifting = (
-                self._prev_ir_mean is not None
+                buffer_full
+                and self._prev_ir_mean is not None
                 and abs(ir_mean_now - self._prev_ir_mean) / (self._prev_ir_mean + 1.0) > 0.03
             )
             self._prev_ir_mean = ir_mean_now
