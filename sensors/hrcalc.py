@@ -75,37 +75,50 @@ def calc_hr_and_spo2(
     ir_ac  = ir  - ir_mean
     red_ac = red - red_mean
 
-    # ── 2. Smooth AC signal to suppress dicrotic notch & noise ─────────────
-    #    5-point moving average (50 ms at 100 Hz) softens the secondary
-    #    dicrotic notch peak without blurring the main cardiac peak.
-    kernel = np.ones(5) / 5.0
-    ir_ac_smooth = np.convolve(ir_ac, kernel, mode='same')
+    # ── 2. Lowpass filter to suppress dicrotic notch ────────────────────────
+    #    Dicrotic notch peaks ~150-250 ms after the systolic peak.
+    #    A 25-point (250 ms at 100 Hz) moving average attenuates it strongly
+    #    while preserving the fundamental cardiac cycle (0.5–2.5 Hz).
+    #    We apply it twice (cascaded) for a steeper roll-off.
+    kernel = np.ones(25) / 25.0
+    ir_smooth = np.convolve(
+        np.convolve(ir_ac, kernel, mode='same'), kernel, mode='same'
+    )
 
-    # ── 3. Peak detection on smoothed AC-IR ────────────────────────────────
-    #    min_distance=0.4 s → max detectable HR = 150 BPM.
-    #    The dicrotic notch occurs ~0.15–0.30 s after the systolic peak,
-    #    so a 0.4 s guard window reliably suppresses it.
-    peaks = _find_peaks(ir_ac_smooth, min_distance=int(sampling_freq * 0.4))
+    # ── 3. Peak detection ───────────────────────────────────────────────────
+    #    min_distance=0.5 s → max HR = 120 BPM (sufficient for resting/active).
+    peaks = _find_peaks(ir_smooth, min_distance=int(sampling_freq * 0.5))
 
     if len(peaks) < 2:
         return -999.0, False, -999.0, False
 
-    # ── 3. Heart rate from inter-peak intervals ─────────────────────────────
+    # ── 4. Reject interval outliers (catches any surviving notch peaks) ─────
+    #    Remove any peak whose interval to the previous peak is < 60% of
+    #    the median interval — those are double-counted pulses.
+    intervals_raw = np.diff(peaks)
+    median_interval = float(np.median(intervals_raw))
+    good_peaks = [peaks[0]]
+    for i in range(1, len(peaks)):
+        if (peaks[i] - good_peaks[-1]) >= 0.6 * median_interval:
+            good_peaks.append(peaks[i])
+    peaks = good_peaks
+
+    if len(peaks) < 2:
+        return -999.0, False, -999.0, False
+
+    # ── 5. Heart rate ───────────────────────────────────────────────────────
     intervals = np.diff(peaks)  # in samples
     avg_interval_samples = np.mean(intervals)
     hr_bpm = (sampling_freq / avg_interval_samples) * 60.0
     hr_valid = 30 <= hr_bpm <= 180
 
-    # ── 4. SpO2 via ratio-of-ratios (cycle-by-cycle peak-to-trough) ──────────
-    #    R = (AC_red/DC_red) / (AC_ir/DC_ir)
-    #    Use per-cycle amplitude instead of std() to reject motion noise.
-    #    Peaks found in ir_ac; trough is the min between consecutive peaks.
+    # ── 6. SpO2 via ratio-of-ratios (cycle-by-cycle peak-to-trough) ────────
     cycle_ac_ir:  list[float] = []
     cycle_ac_red: list[float] = []
     for i in range(1, len(peaks)):
-        seg_ir  = ir_ac_smooth[peaks[i - 1]:peaks[i] + 1]
+        seg_ir  = ir_smooth[peaks[i - 1]:peaks[i] + 1]
         seg_red = red_ac[peaks[i - 1]:peaks[i] + 1]
-        pp_ir   = float(ir_ac_smooth[peaks[i]] - np.min(seg_ir))
+        pp_ir   = float(ir_smooth[peaks[i]] - np.min(seg_ir))
         pp_red  = float(red_ac[peaks[i]] - np.min(seg_red))
         if pp_ir > 0 and pp_red > 0:
             cycle_ac_ir.append(pp_ir)
