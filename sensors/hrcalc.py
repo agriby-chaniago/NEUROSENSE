@@ -174,7 +174,15 @@ def calc_hr_and_spo2(
     ac_ir  = 2.0 * float(np.abs(ir_fft[k]))  / n
     ac_red = 2.0 * float(np.abs(red_fft[k])) / n
 
-    if ac_ir < 1.0 or red_mean < 1.0:
+    # Minimum absolute AC signal gate.
+    # When the DFT bin amplitude is tiny (<50 counts), spectral noise from
+    # breathing or quantisation dominates R — producing R values of 0.1 or 4+.
+    # Both channels must have a meaningful pulsatile component.
+    if ac_ir < 50.0 or ac_red < 10.0:
+        _log.debug(
+            "MAX30102 SpO2 rejected: ac signals too small (ac_ir=%.1f, ac_red=%.1f)",
+            ac_ir, ac_red,
+        )
         return hr_bpm, hr_valid, -999.0, False
 
     # Perfusion index check: reject pure noise (AC/DC too low).

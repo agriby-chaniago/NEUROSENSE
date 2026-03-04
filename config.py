@@ -22,9 +22,9 @@ BMP280_I2C_ADDRESS = 0x76
 # Address: 0x57 (fixed by Maxim datasheet)
 MAX30102_I2C_ADDRESS = 0x57
 # SMP_AVE=4 → effective rate = 400/4 = 100 Hz
-# 200 samples @ 100 Hz = 2 detik data → cukup untuk 2+ cardiac cycles di semua HR range
-# Lebih cepat dari 400 (4 detik), HR/SpO2 muncul lebih cepat untuk keperluan dataset
-MAX30102_SAMPLE_BUFFER = 200
+# 300 samples @ 100 Hz = 3 detik data → 3 cardiac cycles minimum pada 60 BPM
+# (lag=100). Autocorr jauh lebih stabil dengan 3 siklus vs 2 siklus (200 samples).
+MAX30102_SAMPLE_BUFFER = 300
 MAX30102_SAMPLING_RATE_HZ = 400  # Internal sensor sampling rate setting
 
 # ─── Grove GSR Sensor ─────────────────────────────────────────────────────
