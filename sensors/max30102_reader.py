@@ -22,6 +22,11 @@ class MAX30102Reader(BaseSensor):
         self._ema_hr:   float | None = None
         self._ema_spo2: float | None = None
         self._EMA_A = 0.35   # weight for newest reading (higher = faster response)
+        # Consecutive-reject counter: if the algorithm rejects N reads in a row
+        # (noisy signal, bad placement), expire the stale EMA so the display
+        # clears to — and buzzer stops firing on an old cached value.
+        self._reject_count: int = 0
+        self._EMA_MAX_REJECTS = 3   # clear after 3 consecutive bad reads (~6 s)
 
     def calibrate(self) -> None:
         """Initialise the MAX30102 and verify it responds with the correct PART_ID."""
@@ -32,6 +37,7 @@ class MAX30102Reader(BaseSensor):
             )
             self._ema_hr   = None   # reset smoothing on recalibrate
             self._ema_spo2 = None
+            self._reject_count = 0
             part_id = self._sensor.get_part_id()
             if part_id != 0x15:
                 logger.warning(
@@ -78,11 +84,20 @@ class MAX30102Reader(BaseSensor):
             if finger_removed:
                 self._ema_hr   = None
                 self._ema_spo2 = None
+                self._reject_count = 0
             else:
                 # Update EMA only on valid reads
                 if hr_valid:
                     self._ema_hr = hr if self._ema_hr is None else \
                         self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
+                    self._reject_count = 0   # good read — reset counter
+                else:
+                    # Invalid read (noisy/transitional) but finger still present.
+                    # Keep EMA for a few reads; clear after too many in a row.
+                    self._reject_count += 1
+                    if self._reject_count >= self._EMA_MAX_REJECTS:
+                        self._ema_hr   = None
+                        self._ema_spo2 = None
                 if spo2_valid:
                     self._ema_spo2 = spo2 if self._ema_spo2 is None else \
                         self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2

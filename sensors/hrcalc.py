@@ -123,7 +123,15 @@ def calc_hr_and_spo2(
     doubled_lag = best_lag * 2
     if doubled_lag <= lag_max:
         doubled_corr = float(autocorr[doubled_lag])
-        if doubled_corr >= 0.10 * best_corr:   # 0.20 → 0.10: catch weaker T/2 harmonics
+        # For reported HR > 92 BPM (best_lag ≤ 65 samples) resting tachycardia
+        # is rare; the dicrotic notch almost always causes a T/2 false peak.
+        # Accept any non-negative doubled_corr (i.e. autocorr not anti-phase).
+        # For normal HR range (best_lag > 65), use a conservative 0.10 guard.
+        if best_lag <= 65:
+            if doubled_corr > 0.0:
+                best_lag  = doubled_lag
+                best_corr = doubled_corr
+        elif doubled_corr >= 0.10 * best_corr:
             best_lag  = doubled_lag
             best_corr = doubled_corr
 
