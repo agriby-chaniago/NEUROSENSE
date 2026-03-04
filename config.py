@@ -60,7 +60,7 @@ ADS1115_CHANNELS = [
 # ─── Sensor Manager ───────────────────────────────────────────────────────
 # How often (seconds) each sensor thread reads a new value
 BMP280_INTERVAL_S   = 2.0
-MAX30102_INTERVAL_S = 4.0   # Longer — needs to collect buffer of samples
+MAX30102_INTERVAL_S = 0.0   # read_sequential() already blocks for the buffer duration
 GSR_INTERVAL_S      = 0.5
 ADS1115_INTERVAL_S  = 0.5
 

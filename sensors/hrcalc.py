@@ -65,7 +65,11 @@ def calc_hr_and_spo2(
     red_mean = np.mean(red)
 
     if ir_mean < 5000:
-        # No finger on sensor
+        # No finger on sensor (or finger not properly placed)
+        import logging as _log
+        _log.getLogger(__name__).debug(
+            "MAX30102: no finger detected (ir_mean=%.0f < 5000)", ir_mean
+        )
         return -999.0, False, -999.0, False
 
     ir_ac  = ir  - ir_mean
