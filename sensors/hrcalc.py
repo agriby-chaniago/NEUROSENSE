@@ -123,15 +123,13 @@ def calc_hr_and_spo2(
     doubled_lag = best_lag * 2
     if doubled_lag <= lag_max:
         doubled_corr = float(autocorr[doubled_lag])
-        # For reported HR > 92 BPM (best_lag ≤ 65 samples) resting tachycardia
-        # is rare; the dicrotic notch almost always causes a T/2 false peak.
-        # Accept any non-negative doubled_corr (i.e. autocorr not anti-phase).
-        # For normal HR range (best_lag > 65), use a conservative 0.10 guard.
-        if best_lag <= 65:
-            if doubled_corr > 0.0:
-                best_lag  = doubled_lag
-                best_corr = doubled_corr
-        elif doubled_corr >= 0.10 * best_corr:
+        # For best_lag ≤ 65 (reported HR > 92 BPM): with only ~2 cycles in a
+        # 200-sample buffer the autocorr at T can go slightly negative due to
+        # noise, so the "> 0" guard incorrectly blocks the doubling.
+        # A resting HR > 92 BPM sitting still is extremely unusual; the cause
+        # is almost always a T/2 dicrotic-notch peak. Double unconditionally.
+        # For normal HR range (best_lag > 65) keep the 0.10 guard.
+        if best_lag <= 65 or doubled_corr >= 0.10 * best_corr:
             best_lag  = doubled_lag
             best_corr = doubled_corr
 
