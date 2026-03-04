@@ -138,10 +138,21 @@ def calc_hr_and_spo2(
     if ac_ir < 1.0 or red_mean < 1.0:
         return hr_bpm, hr_valid, -999.0, False
 
+    # Perfusion index check: reject motion artifacts (AC/DC too high)
+    # and noise-dominated reads (AC/DC too low).
+    # Normal PPG: 0.05%–5%. Motion artifact: >5%. Pure noise: <0.05%.
+    pi_ir = ac_ir / ir_mean
+    if pi_ir > 0.05 or pi_ir < 0.0001:
+        _log.warning(
+            "MAX30102 SpO2 rejected: perfusion_index=%.4f%% (need 0.01%%–5%%)",
+            pi_ir * 100,
+        )
+        return hr_bpm, hr_valid, -999.0, False
+
     r = (ac_red / red_mean) / (ac_ir / ir_mean)
     _log.info(
-        "MAX30102 SpO2: ac_ir=%.1f  ac_red=%.1f  R=%.3f",
-        ac_ir, ac_red, r,
+        "MAX30102 SpO2: ac_ir=%.1f  ac_red=%.1f  PI=%.3f%%  R=%.3f",
+        ac_ir, ac_red, pi_ir * 100, r,
     )
     r_idx    = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
     spo2     = float(_SPO2_TABLE[r_idx])

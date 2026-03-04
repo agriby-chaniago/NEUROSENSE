@@ -18,6 +18,10 @@ class MAX30102Reader(BaseSensor):
     def __init__(self):
         self._sensor: MAX30102 | None = None
         self._last_error: str | None = None
+        # EMA smoothing — absorbs single-read jitter
+        self._ema_hr:   float | None = None
+        self._ema_spo2: float | None = None
+        self._EMA_A = 0.35   # weight for newest reading (higher = faster response)
 
     def calibrate(self) -> None:
         """Initialise the MAX30102 and verify it responds with the correct PART_ID."""
@@ -26,6 +30,8 @@ class MAX30102Reader(BaseSensor):
                 i2c_bus=config.I2C_BUS,
                 address=config.MAX30102_I2C_ADDRESS,
             )
+            self._ema_hr   = None   # reset smoothing on recalibrate
+            self._ema_spo2 = None
             part_id = self._sensor.get_part_id()
             if part_id != 0x15:
                 logger.warning(
@@ -66,11 +72,23 @@ class MAX30102Reader(BaseSensor):
                 sampling_freq=config.MAX30102_SAMPLING_RATE_HZ // 4,  # SMP_AVE=4
             )
             self._last_error = None
+
+            # Update EMA only when reading is valid
+            if hr_valid:
+                self._ema_hr = hr if self._ema_hr is None else \
+                    self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
+            if spo2_valid:
+                self._ema_spo2 = spo2 if self._ema_spo2 is None else \
+                    self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2
+
+            out_hr   = round(self._ema_hr,   1) if self._ema_hr   is not None and hr_valid   else None
+            out_spo2 = round(self._ema_spo2, 1) if self._ema_spo2 is not None and spo2_valid else None
+
             result = {
-                "heart_rate_bpm": hr if hr_valid else None,
-                "spo2_percent":   spo2 if spo2_valid else None,
-                "hr_valid":       hr_valid,
-                "spo2_valid":     spo2_valid,
+                "heart_rate_bpm": out_hr,
+                "spo2_percent":   out_spo2,
+                "hr_valid":       out_hr   is not None,
+                "spo2_valid":     out_spo2 is not None,
             }
             logger.debug("MAX30102: %s", result)
             return result
