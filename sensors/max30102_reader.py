@@ -49,6 +49,9 @@ class MAX30102Reader(BaseSensor):
         self._prev_hr_bpm: float | None = None
         self._spo2_guard_count: int = 0
         self._SPO2_MIN_STABLE = 3   # reads within ±8 BPM needed before SpO2 updates
+        # IR drift guard: don't update SpO2 EMA while the DC level is shifting
+        # (finger repositioning, placement, removal).  >3% change = transitional.
+        self._prev_ir_mean: float | None = None
 
     def calibrate(self) -> None:
         """Initialise the MAX30102 and verify it responds with the correct PART_ID."""
@@ -62,6 +65,7 @@ class MAX30102Reader(BaseSensor):
             self._reject_count = 0
             self._prev_hr_bpm = None
             self._spo2_guard_count = 0
+            self._prev_ir_mean = None
             self._ring_ir.clear()
             self._ring_red.clear()
             part_id = self._sensor.get_part_id()
@@ -115,9 +119,16 @@ class MAX30102Reader(BaseSensor):
             ir_data  = list(self._ring_ir)
             red_data = list(self._ring_red)
 
+            ir_mean_now = float(_np.mean(ir_data))
+            ir_drifting = (
+                self._prev_ir_mean is not None
+                and abs(ir_mean_now - self._prev_ir_mean) / (self._prev_ir_mean + 1.0) > 0.03
+            )
+            self._prev_ir_mean = ir_mean_now
+
             logger.info(
                 "MAX30102 buffer: ir_mean=%.0f  red_mean=%.0f  samples=%d",
-                float(_np.mean(ir_data)), float(_np.mean(red_data)), len(ir_data),
+                ir_mean_now, float(_np.mean(red_data)), len(ir_data),
             )
             hr, hr_valid, spo2, spo2_valid = calc_hr_and_spo2(
                 ir_data, red_data,
@@ -133,6 +144,7 @@ class MAX30102Reader(BaseSensor):
                 self._reject_count = 0
                 self._prev_hr_bpm = None
                 self._spo2_guard_count = 0
+                self._prev_ir_mean = None
                 self._ring_ir.clear()    # flush stale low-IR samples
                 self._ring_red.clear()
             else:
@@ -156,13 +168,13 @@ class MAX30102Reader(BaseSensor):
                     if self._reject_count >= self._EMA_MAX_REJECTS:
                         self._ema_hr   = None
                         self._ema_spo2 = None
-                if spo2_valid and self._spo2_guard_count >= self._SPO2_MIN_STABLE:
+                if spo2_valid and self._spo2_guard_count >= self._SPO2_MIN_STABLE and not ir_drifting:
                     self._ema_spo2 = spo2 if self._ema_spo2 is None else \
                         self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2
                 elif spo2_valid:
                     logger.debug(
-                        "MAX30102 SpO2 deferred: HR not yet stable (%d/%d reads)",
-                        self._spo2_guard_count, self._SPO2_MIN_STABLE,
+                        "MAX30102 SpO2 deferred: HR stable=%d/%d  ir_drifting=%s",
+                        self._spo2_guard_count, self._SPO2_MIN_STABLE, ir_drifting,
                     )
 
             # Show last known EMA even when current read is invalid (e.g. motion)

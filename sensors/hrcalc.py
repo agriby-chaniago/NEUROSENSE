@@ -106,10 +106,15 @@ def calc_hr_and_spo2(
     red_ac *= window
 
     # ── 2. HR via autocorrelation ───────────────────────────────────────────
-    #    Search lag range: 0.4 s–1.5 s → 40–150 BPM at 100 Hz
-    #    (lag_min = 100/150*60 = 40 samples → 150 BPM max)
-    lag_min = int(round(sampling_freq * 60.0 / 150))  # 40 samples
-    lag_max = int(round(sampling_freq * 60.0 / 40))   # 150 samples
+    #    Search lag range covers 36–150 BPM (not 40–150) so that the harmonic
+    #    doubling stage can reach lag*2 for lag=20 (true HR ~37.5 BPM).
+    #    At fs=25: lag_max = round(25×60/36) = 42; doubled_lag of 20 = 40 ≤ 42 ✓
+    #    Without this, doubled_lag=40 > lag_max=38 and the doubling is silently
+    #    skipped → 75 BPM false read is accepted.
+    #    ALERT_HR_LOW is still 40 BPM; the extra 36–40 BPM search band only
+    #    serves as a landing zone for the harmonic check.
+    lag_min = int(round(sampling_freq * 60.0 / 150))  # e.g. 10 at fs=25
+    lag_max = int(round(sampling_freq * 60.0 / 36))   # e.g. 42 at fs=25
     # Use 3/4 of buffer so lags up to 150 samples are reachable even with
     # n=200 (n//2=100 would block 40-60 BPM range and prevent harmonic check).
     lag_max = min(lag_max, n * 3 // 4)
@@ -144,7 +149,7 @@ def calc_hr_and_spo2(
         # this threshold. harmonic_min_lag is proportional to sampling_freq,
         # e.g. at fs=25: int(25*60/92)=16; at fs=100: int(100*60/92)=65.
         harmonic_min_lag = int(sampling_freq * 60.0 / 92.0)
-        if best_lag <= harmonic_min_lag or doubled_corr >= 0.10 * best_corr:
+        if best_lag <= harmonic_min_lag or doubled_corr >= 0.75 * best_corr:
             best_lag  = doubled_lag
             best_corr = doubled_corr
 
