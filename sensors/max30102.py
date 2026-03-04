@@ -85,9 +85,11 @@ class MAX30102:
         self._write(REG_MODE_CONFIG, 0x03)    # SPO2 mode
         self._write(REG_SPO2_CONFIG, 0x27)    # ADC_RGE=4096nA, SR=400Hz, LED_PW=411µs (18-bit)
 
-        # LED pulse amplitudes (~25.4mA each; 0x7F = 127 × 0.2mA, better SNR)
-        self._write(REG_LED1_PA, 0x7F)        # Red  ~25.4 mA
-        self._write(REG_LED2_PA, 0x7F)        # IR   ~25.4 mA
+        # LED pulse amplitudes — 0x24 = 36 × 0.2mA = 7.2mA each.
+        # At 18-bit ADC full-scale (262143) with 25mA the signal saturates.
+        # 7.2mA gives ir_mean ~50k–120k with finger properly placed (ideal range).
+        self._write(REG_LED1_PA, 0x24)        # Red  ~7.2 mA
+        self._write(REG_LED2_PA, 0x24)        # IR   ~7.2 mA
         self._write(REG_PILOT_PA, 0x7F)
 
     # ── I2C primitives ───────────────────────────────────────────────────
