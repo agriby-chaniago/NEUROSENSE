@@ -148,6 +148,11 @@ def calc_hr_and_spo2(
             best_lag  = doubled_lag
             best_corr = doubled_corr
 
+    # Post-harmonic boundary guard: harmonic doubling can push best_lag onto
+    # lag_max (e.g. original=19 passes pre-harmonic guard, doubles to 38==lag_max).
+    if best_lag == lag_max and best_corr < 0.55:
+        return -999.0, False, -999.0, False
+
     _log.info(
         "MAX30102 autocorr: best_lag=%d  corr=%.3f  → %.1f BPM",
         best_lag, best_corr, (sampling_freq / best_lag) * 60.0,

@@ -43,6 +43,12 @@ class MAX30102Reader(BaseSensor):
         # clears to — and buzzer stops firing on an old cached value.
         self._reject_count: int = 0
         self._EMA_MAX_REJECTS = 3   # clear after 3 consecutive bad reads
+        # SpO2 stability guard: require N consecutive reads with consistent HR
+        # before updating SpO2 EMA.  Prevents bad R values during buffer
+        # warm-up (settling data still in ring buffer after finger placement).
+        self._prev_hr_bpm: float | None = None
+        self._spo2_guard_count: int = 0
+        self._SPO2_MIN_STABLE = 3   # reads within ±8 BPM needed before SpO2 updates
 
     def calibrate(self) -> None:
         """Initialise the MAX30102 and verify it responds with the correct PART_ID."""
@@ -54,6 +60,8 @@ class MAX30102Reader(BaseSensor):
             self._ema_hr   = None   # reset smoothing on recalibrate
             self._ema_spo2 = None
             self._reject_count = 0
+            self._prev_hr_bpm = None
+            self._spo2_guard_count = 0
             self._ring_ir.clear()
             self._ring_red.clear()
             part_id = self._sensor.get_part_id()
@@ -123,6 +131,8 @@ class MAX30102Reader(BaseSensor):
                 self._ema_hr   = None
                 self._ema_spo2 = None
                 self._reject_count = 0
+                self._prev_hr_bpm = None
+                self._spo2_guard_count = 0
                 self._ring_ir.clear()    # flush stale low-IR samples
                 self._ring_red.clear()
             else:
@@ -131,6 +141,14 @@ class MAX30102Reader(BaseSensor):
                     self._ema_hr = hr if self._ema_hr is None else \
                         self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
                     self._reject_count = 0   # good read — reset counter
+                    # SpO2 stability gate: count consecutive reads within ±8 BPM
+                    if self._prev_hr_bpm is not None and abs(hr - self._prev_hr_bpm) <= 8.0:
+                        self._spo2_guard_count = min(
+                            self._spo2_guard_count + 1, self._SPO2_MIN_STABLE
+                        )
+                    else:
+                        self._spo2_guard_count = 0
+                    self._prev_hr_bpm = hr
                 else:
                     # Invalid read (noisy/transitional) but finger still present.
                     # Keep EMA for a few reads; clear after too many in a row.
@@ -138,9 +156,14 @@ class MAX30102Reader(BaseSensor):
                     if self._reject_count >= self._EMA_MAX_REJECTS:
                         self._ema_hr   = None
                         self._ema_spo2 = None
-                if spo2_valid:
+                if spo2_valid and self._spo2_guard_count >= self._SPO2_MIN_STABLE:
                     self._ema_spo2 = spo2 if self._ema_spo2 is None else \
                         self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2
+                elif spo2_valid:
+                    logger.debug(
+                        "MAX30102 SpO2 deferred: HR not yet stable (%d/%d reads)",
+                        self._spo2_guard_count, self._SPO2_MIN_STABLE,
+                    )
 
             # Show last known EMA even when current read is invalid (e.g. motion)
             # so the dashboard doesn't flicker back to — on every noisy frame.
