@@ -74,7 +74,9 @@ class TestCalcHrAndSpo2:
 
     def test_valid_hr_range(self):
         ir  = self._synthetic_hr(bpm=75)
-        red = self._synthetic_hr(bpm=75)
+        # Red: half AC amplitude of IR → R ≈ 0.5 (SpO2~98%), avoids R>0.95 gate
+        dc = 100_000
+        red = [int(dc + 0.5 * (v - dc)) for v in ir]
         hr, hr_valid, spo2, spo2_valid = calc_hr_and_spo2(ir, red, sampling_freq=100)
         assert hr_valid, f"Expected valid HR, got {hr}"
         assert 50 <= hr <= 100, f"HR {hr} BPM out of expected range"

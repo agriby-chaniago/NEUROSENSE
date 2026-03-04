@@ -82,7 +82,9 @@ def calc_hr_and_spo2(
     #    (lag_min = 100/150*60 = 40 samples → 150 BPM max)
     lag_min = int(round(sampling_freq * 60.0 / 150))  # 40 samples
     lag_max = int(round(sampling_freq * 60.0 / 40))   # 150 samples
-    lag_max = min(lag_max, n // 2)
+    # Use 3/4 of buffer so lags up to 150 samples are reachable even with
+    # n=200 (n//2=100 would block 40-60 BPM range and prevent harmonic check).
+    lag_max = min(lag_max, n * 3 // 4)
 
     if lag_min >= lag_max:
         return -999.0, False, -999.0, False
@@ -99,11 +101,13 @@ def calc_hr_and_spo2(
 
     # ── Harmonic check ───────────────────────────────────────────────────────
     #    The dicrotic notch can make autocorr peak at T/2 (double HR).
-    #    If corr[lag*2] >= 0.2 * corr[lag], the true period is lag*2.
-    #    NOTE: allow doubled_lag beyond lag_max (autocorr array is still valid
-    #    at those indices); lag validity is enforced below by hr_valid check.
+    #    If the true period is T = 2*best_lag and corr[2*best_lag] >= 0.2
+    #    of best_corr, prefer the doubled lag (lower / correct HR).
+    #    Guard: doubled_lag <= lag_max ensures we only double into a valid HR
+    #    range, preventing a correct lag from being doubled unnecessarily.
+    #    Since lag_max is now n*3//4, this covers the full 40-150 BPM range.
     doubled_lag = best_lag * 2
-    if doubled_lag < len(autocorr):   # within array bounds, not just lag_max
+    if doubled_lag <= lag_max:
         doubled_corr = float(autocorr[doubled_lag])
         if doubled_corr >= 0.2 * best_corr:
             best_lag  = doubled_lag
