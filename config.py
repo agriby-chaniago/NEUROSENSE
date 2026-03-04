@@ -21,7 +21,10 @@ BMP280_I2C_ADDRESS = 0x76
 # INT pin NOT used (polling mode — avoids Pi 5 GPIO interrupt issues)
 # Address: 0x57 (fixed by Maxim datasheet)
 MAX30102_I2C_ADDRESS = 0x57
-MAX30102_SAMPLE_BUFFER = 100  # Number of IR/Red samples per HR calculation
+# SMP_AVE=4 → effective rate = 400/4 = 100 Hz
+# 400 samples @ 100 Hz = 4 detik data → cukup untuk deteksi 2-3 peaks di semua HR range (40-180 BPM)
+# 100 samples (default lama) = 1 detik → hanya 1 peak di 60 BPM → HR tidak akurat
+MAX30102_SAMPLE_BUFFER = 400
 MAX30102_SAMPLING_RATE_HZ = 400  # Internal sensor sampling rate setting
 
 # ─── Grove GSR Sensor ─────────────────────────────────────────────────────

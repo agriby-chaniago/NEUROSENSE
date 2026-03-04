@@ -84,12 +84,28 @@ def calc_hr_and_spo2(
     hr_bpm = (sampling_freq / avg_interval_samples) * 60.0
     hr_valid = 30 <= hr_bpm <= 250
 
-    # ── 4. SpO2 via ratio-of-ratios ────────────────────────────────────────
+    # ── 4. SpO2 via ratio-of-ratios (cycle-by-cycle peak-to-trough) ──────────
     #    R = (AC_red/DC_red) / (AC_ir/DC_ir)
-    ac_red = np.std(red_ac)
-    ac_ir  = np.std(ir_ac)
+    #    Use per-cycle amplitude instead of std() to reject motion noise.
+    #    Peaks found in ir_ac; trough is the min between consecutive peaks.
+    cycle_ac_ir:  list[float] = []
+    cycle_ac_red: list[float] = []
+    for i in range(1, len(peaks)):
+        seg_ir  = ir_ac[peaks[i - 1]:peaks[i] + 1]
+        seg_red = red_ac[peaks[i - 1]:peaks[i] + 1]
+        pp_ir   = float(ir_ac[peaks[i]] - np.min(seg_ir))
+        pp_red  = float(red_ac[peaks[i]] - np.min(seg_red))
+        if pp_ir > 0 and pp_red > 0:
+            cycle_ac_ir.append(pp_ir)
+            cycle_ac_red.append(pp_red)
 
-    if ac_ir < 1.0 or red_mean < 1.0:
+    if not cycle_ac_ir or ir_mean < 1.0 or red_mean < 1.0:
+        return hr_bpm, hr_valid, -999.0, False
+
+    ac_ir  = float(np.mean(cycle_ac_ir))
+    ac_red = float(np.mean(cycle_ac_red))
+
+    if ac_ir < 1.0:
         return hr_bpm, hr_valid, -999.0, False
 
     r = (ac_red / red_mean) / (ac_ir / ir_mean)
