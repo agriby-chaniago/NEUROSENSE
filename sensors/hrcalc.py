@@ -89,6 +89,18 @@ def calc_hr_and_spo2(
         )
         return -999.0, False, -999.0, False
 
+    # ── Linear detrend ──────────────────────────────────────────────────────
+    #    Respiration (~0.2–0.3 Hz) causes a slow sinusoidal baseline drift that
+    #    survives the mean subtraction.  With only ~2 cardiac cycles in 200 s,
+    #    this drift makes the second half of the buffer anti-correlate with the
+    #    first half → negative normalised autocorr even for a real PPG signal.
+    #    A linear fit + subtraction removes the dominant slope component cheaply.
+    t = np.arange(n, dtype=np.float64)
+    ir_slope  = np.polyfit(t, ir_ac,  1)
+    red_slope = np.polyfit(t, red_ac, 1)
+    ir_ac  -= np.polyval(ir_slope,  t)
+    red_ac -= np.polyval(red_slope, t)
+
     # ── 2. HR via autocorrelation ───────────────────────────────────────────
     #    Search lag range: 0.4 s–1.5 s → 40–150 BPM at 100 Hz
     #    (lag_min = 100/150*60 = 40 samples → 150 BPM max)
@@ -138,8 +150,10 @@ def calc_hr_and_spo2(
         best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
     )
 
-    # Require at least 0.20 correlation — noisy/transitional reads sit at 0.08-0.19
-    if best_corr < 0.20:
+    # Require at least 0.07 correlation after detrending.
+    # With linear detrend, legitimate PPG gives ~0.10–0.50; pure noise ≈ 0.0.
+    # (Was 0.20 — too strict even for real cardiac signal with only 2 cycles.)
+    if best_corr < 0.07:
         return -999.0, False, -999.0, False
 
     hr_bpm   = (sampling_freq / best_lag) * 60.0
