@@ -89,17 +89,21 @@ def calc_hr_and_spo2(
         )
         return -999.0, False, -999.0, False
 
-    # ── Linear detrend ──────────────────────────────────────────────────────
-    #    Respiration (~0.2–0.3 Hz) causes a slow sinusoidal baseline drift that
-    #    survives the mean subtraction.  With only ~2 cardiac cycles in 200 s,
-    #    this drift makes the second half of the buffer anti-correlate with the
-    #    first half → negative normalised autocorr even for a real PPG signal.
-    #    A linear fit + subtraction removes the dominant slope component cheaply.
+    # ── Hanning window + detrend ───────────────────────────────────────────
+    #    Respiratory amplitude modulation makes the PPG envelope vary slowly
+    #    across the buffer. Linear detrend removes only a slope; the sinusoidal
+    #    respiratory component still causes large negative autocorr at cardiac lags.
+    #    A Hanning window tapers edges to zero so end-effects don't anti-correlate
+    #    with the centre. Combined with linear detrend it handles both slope and
+    #    amplitude variation reliably.
     t = np.arange(n, dtype=np.float64)
     ir_slope  = np.polyfit(t, ir_ac,  1)
     red_slope = np.polyfit(t, red_ac, 1)
     ir_ac  -= np.polyval(ir_slope,  t)
     red_ac -= np.polyval(red_slope, t)
+    window  = np.hanning(n)
+    ir_ac  *= window
+    red_ac *= window
 
     # ── 2. HR via autocorrelation ───────────────────────────────────────────
     #    Search lag range: 0.4 s–1.5 s → 40–150 BPM at 100 Hz
@@ -149,10 +153,10 @@ def calc_hr_and_spo2(
         best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
     )
 
-    # Require at least 0.25 correlation after detrending.
-    # With linear detrend, stable PPG gives ~0.30–0.55; settling/noisy reads
-    # sit at 0.10–0.24 and almost always produce wrong lags (120–150 range).
-    if best_corr < 0.25:
+    # Require at least 0.10 correlation after detrend+window.
+    # Hanning window reduces peak height ~50% vs rectangular, so stable PPG
+    # gives ~0.15–0.35 (was 0.30–0.55 without window). Pure noise ≈ 0.0.
+    if best_corr < 0.10:
         return -999.0, False, -999.0, False
 
     hr_bpm   = (sampling_freq / best_lag) * 60.0

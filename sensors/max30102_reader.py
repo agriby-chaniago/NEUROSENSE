@@ -1,8 +1,14 @@
 """
 sensors/max30102_reader.py  –  High-level MAX30102 sensor reader.
 Uses polling mode (no INT pin) — compatible with Raspberry Pi 5.
+
+Sliding-window ring buffer: collects STEP_SIZE new samples per call,
+runs the HR/SpO2 algorithm on the latest SAMPLE_BUFFER samples.
+First result appears after SAMPLE_BUFFER samples (~3 s at 100 Hz);
+subsequent results appear every STEP_SIZE samples (~1 s).
 """
 
+import collections
 import logging
 from . import BaseSensor
 from .max30102 import MAX30102
@@ -11,6 +17,9 @@ import config
 
 logger = logging.getLogger(__name__)
 
+# New samples collected per read() call.  Smaller = faster updates but more CPU.
+_STEP_SIZE = 100   # ~1 s at 100 Hz effective
+
 
 class MAX30102Reader(BaseSensor):
     name = "max30102"
@@ -18,6 +27,13 @@ class MAX30102Reader(BaseSensor):
     def __init__(self):
         self._sensor: MAX30102 | None = None
         self._last_error: str | None = None
+        # Sliding-window ring buffers
+        self._ring_ir:  collections.deque = collections.deque(
+            maxlen=config.MAX30102_SAMPLE_BUFFER
+        )
+        self._ring_red: collections.deque = collections.deque(
+            maxlen=config.MAX30102_SAMPLE_BUFFER
+        )
         # EMA smoothing — absorbs single-read jitter
         self._ema_hr:   float | None = None
         self._ema_spo2: float | None = None
@@ -26,7 +42,7 @@ class MAX30102Reader(BaseSensor):
         # (noisy signal, bad placement), expire the stale EMA so the display
         # clears to — and buzzer stops firing on an old cached value.
         self._reject_count: int = 0
-        self._EMA_MAX_REJECTS = 3   # clear after 3 consecutive bad reads (~6 s)
+        self._EMA_MAX_REJECTS = 3   # clear after 3 consecutive bad reads
 
     def calibrate(self) -> None:
         """Initialise the MAX30102 and verify it responds with the correct PART_ID."""
@@ -38,6 +54,8 @@ class MAX30102Reader(BaseSensor):
             self._ema_hr   = None   # reset smoothing on recalibrate
             self._ema_spo2 = None
             self._reject_count = 0
+            self._ring_ir.clear()
+            self._ring_red.clear()
             part_id = self._sensor.get_part_id()
             if part_id != 0x15:
                 logger.warning(
@@ -55,7 +73,8 @@ class MAX30102Reader(BaseSensor):
 
     def read(self) -> dict:
         """
-        Collect a buffer of samples and calculate HR + SpO2.
+        Collect _STEP_SIZE new samples, append to ring buffer, then run
+        HR/SpO2 algorithm on the latest SAMPLE_BUFFER samples.
 
         Returns
         -------
@@ -65,10 +84,29 @@ class MAX30102Reader(BaseSensor):
             raise RuntimeError("MAX30102Reader not calibrated; call calibrate() first.")
 
         try:
-            red_data, ir_data = self._sensor.read_sequential(
-                sample_count=config.MAX30102_SAMPLE_BUFFER
+            # Collect a small step batch instead of the full buffer each time
+            red_step, ir_step = self._sensor.read_sequential(
+                sample_count=_STEP_SIZE
             )
+            self._ring_ir.extend(ir_step)
+            self._ring_red.extend(red_step)
+
             import numpy as _np  # local import, lightweight
+
+            # Not enough samples yet to calculate
+            if len(self._ring_ir) < config.MAX30102_SAMPLE_BUFFER:
+                logger.debug(
+                    "MAX30102 ring buffer filling: %d/%d samples",
+                    len(self._ring_ir), config.MAX30102_SAMPLE_BUFFER,
+                )
+                return {
+                    "heart_rate_bpm": None, "spo2_percent": None,
+                    "hr_valid": False,      "spo2_valid":  False,
+                }
+
+            ir_data  = list(self._ring_ir)
+            red_data = list(self._ring_red)
+
             logger.info(
                 "MAX30102 buffer: ir_mean=%.0f  red_mean=%.0f  samples=%d",
                 float(_np.mean(ir_data)), float(_np.mean(red_data)), len(ir_data),
@@ -79,12 +117,14 @@ class MAX30102Reader(BaseSensor):
             )
             self._last_error = None
 
-            # Finger removed → hard-reset EMA so display clears to —
+            # Finger removed → hard-reset EMA + ring buffer so display clears to —
             finger_removed = (hr == -999.0 and not hr_valid)
             if finger_removed:
                 self._ema_hr   = None
                 self._ema_spo2 = None
                 self._reject_count = 0
+                self._ring_ir.clear()    # flush stale low-IR samples
+                self._ring_red.clear()
             else:
                 # Update EMA only on valid reads
                 if hr_valid:
