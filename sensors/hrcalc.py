@@ -75,27 +75,34 @@ def calc_hr_and_spo2(
     ir_ac  = ir  - ir_mean
     red_ac = red - red_mean
 
-    # ── 2. Lowpass filter to suppress dicrotic notch ────────────────────────
-    #    Dicrotic notch peaks ~150-250 ms after the systolic peak.
-    #    A 25-point (250 ms at 100 Hz) moving average attenuates it strongly
-    #    while preserving the fundamental cardiac cycle (0.5–2.5 Hz).
-    #    We apply it twice (cascaded) for a steeper roll-off.
-    kernel = np.ones(25) / 25.0
-    ir_smooth = np.convolve(
-        np.convolve(ir_ac, kernel, mode='same'), kernel, mode='same'
-    )
+    # ── 2. Lowpass filter — single 15-pt MA (150 ms at 100 Hz) ─────────────
+    #    Enough to attenuate the dicrotic notch (250-350 ms after systolic)
+    #    without merging adjacent cardiac peaks (600+ ms apart at 100 BPM).
+    kernel = np.ones(15) / 15.0
+    ir_smooth = np.convolve(ir_ac, kernel, mode='same')
 
     # ── 3. Peak detection ───────────────────────────────────────────────────
-    #    min_distance=0.5 s → max HR = 120 BPM (sufficient for resting/active).
+    #    min_distance=0.5 s → max 120 BPM. Dicrotic notch is always < 0.4 s
+    #    after the systolic peak so this guard window safely excludes it.
     peaks = _find_peaks(ir_smooth, min_distance=int(sampling_freq * 0.5))
 
     if len(peaks) < 2:
         return -999.0, False, -999.0, False
 
-    # ── 4. Reject interval outliers (catches any surviving notch peaks) ─────
-    #    Remove any peak whose interval to the previous peak is < 60% of
-    #    the median interval — those are double-counted pulses.
-    intervals_raw = np.diff(peaks)
+    # ── 4. Reject low-amplitude peaks (secondary / noise peaks) ────────────
+    #    Keep only peaks that are at least 40% of the tallest peak.
+    #    The dicrotic notch is typically 20-35% of systolic amplitude.
+    peak_heights = np.array([ir_smooth[p] for p in peaks])
+    max_height   = float(np.max(peak_heights))
+    peaks = [p for p, h in zip(peaks, peak_heights) if h >= 0.4 * max_height]
+
+    if len(peaks) < 2:
+        return -999.0, False, -999.0, False
+
+    # ── 5. Interval outlier rejection ──────────────────────────────────────
+    #    Discard any peak whose interval to the prior accepted peak is less
+    #    than 60% of the median — catches any still-surviving spurious peak.
+    intervals_raw  = np.diff(peaks)
     median_interval = float(np.median(intervals_raw))
     good_peaks = [peaks[0]]
     for i in range(1, len(peaks)):
