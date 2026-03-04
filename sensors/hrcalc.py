@@ -113,8 +113,8 @@ def calc_hr_and_spo2(
         best_lag, best_corr, (sampling_freq / best_lag) * 60.0,
     )
 
-    # Require at least 0.3 correlation — pure noise gives ~0.0
-    if best_corr < 0.3:
+    # Require at least 0.08 correlation — pure noise gives ~0.0
+    if best_corr < 0.08:
         return -999.0, False, -999.0, False
 
     hr_bpm   = (sampling_freq / best_lag) * 60.0
@@ -138,13 +138,12 @@ def calc_hr_and_spo2(
     if ac_ir < 1.0 or red_mean < 1.0:
         return hr_bpm, hr_valid, -999.0, False
 
-    # Perfusion index check: reject motion artifacts (AC/DC too high)
-    # and noise-dominated reads (AC/DC too low).
-    # Normal PPG: 0.05%–5%. Motion artifact: >5%. Pure noise: <0.05%.
+    # Perfusion index check: reject pure noise (AC/DC too low).
+    # Normal PPG: 0.05%–15%. Pure noise: <0.01%.
     pi_ir = ac_ir / ir_mean
-    if pi_ir > 0.05 or pi_ir < 0.0001:
+    if pi_ir < 0.0001:
         _log.warning(
-            "MAX30102 SpO2 rejected: perfusion_index=%.4f%% (need 0.01%%–5%%)",
+            "MAX30102 SpO2 rejected: perfusion_index=%.4f%% (need >0.01%%)",
             pi_ir * 100,
         )
         return hr_bpm, hr_valid, -999.0, False
