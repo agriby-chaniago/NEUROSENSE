@@ -56,6 +56,11 @@ class MAX30102Reader(BaseSensor):
             red_data, ir_data = self._sensor.read_sequential(
                 sample_count=config.MAX30102_SAMPLE_BUFFER
             )
+            import numpy as _np  # local import, lightweight
+            logger.info(
+                "MAX30102 buffer: ir_mean=%.0f  red_mean=%.0f  samples=%d",
+                float(_np.mean(ir_data)), float(_np.mean(red_data)), len(ir_data),
+            )
             hr, hr_valid, spo2, spo2_valid = calc_hr_and_spo2(
                 ir_data, red_data,
                 sampling_freq=config.MAX30102_SAMPLING_RATE_HZ // 4,  # SMP_AVE=4
