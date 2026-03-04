@@ -129,7 +129,9 @@ BUZZER_STARTUP_BEEP  = True
 
 # Heart Rate (BPM)
 ALERT_HR_HIGH    = 120   # > 120 BPM → tachycardia warning
-ALERT_HR_LOW     = 45    # < 45 BPM  → bradycardia warning
+# 40 BPM = lag_max boundary — hampir semua baca ≤40 BPM adalah artifact lag_max,
+# bukan bradycardia nyata. Turunkan threshold agar tidak false-alert.
+ALERT_HR_LOW     = 40    # < 40 BPM  → bradycardia berat
 
 # SpO2 (%)
 # Sensor MAX30102 memberikan pembacaan ~4-6% lebih rendah dari nilai sebenarnya

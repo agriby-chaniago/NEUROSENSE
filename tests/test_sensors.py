@@ -183,7 +183,7 @@ class TestBuzzerAlerts:
 
     def test_hr_low_triggers_alert(self):
         b = self._make_buzzer()
-        data = {"heart_rate_bpm": 40, "hr_valid": True,
+        data = {"heart_rate_bpm": 39, "hr_valid": True,  # 39 < 40 threshold
                 "spo2_percent": 98, "spo2_valid": True,
                 "gsr_conductance_us": 5.0}
         active, reasons = b.check_and_alert(data)
