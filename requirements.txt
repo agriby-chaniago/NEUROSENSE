@@ -14,8 +14,8 @@ Pillow>=10.0.0          # required for Arducam/picamera2 JPEG encoding
 #   USB Arducam fallback:
 #     pip install opencv-python-headless
 # picamera2 is not listed here — install via apt on Raspberry Pi OS.
-# Uncomment to install OpenCV fallback in venv:
-# opencv-python-headless==4.9.0.80
+# OpenCV fallback for USB Arducam (or when CSI camera not detected):
+opencv-python-headless>=4.9.0
 
 # Development / testing only
 pytest==8.3.4

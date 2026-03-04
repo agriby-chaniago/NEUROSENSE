@@ -123,6 +123,20 @@ class CameraReader:
     def _loop_picamera2(self):
         from picamera2 import Picamera2  # type: ignore
 
+        # Check that at least one camera is visible to libcamera before opening
+        available = Picamera2.global_camera_info()
+        if not available:
+            raise RuntimeError(
+                "No cameras detected by libcamera. "
+                "Run: libcamera-hello --list-cameras\n"
+                "If empty, enable the camera overlay:\n"
+                "  sudo raspi-config → Interface Options → Camera\n"
+                "  OR add 'camera_auto_detect=1' to /boot/firmware/config.txt "
+                "then reboot."
+            )
+        logger.info("CameraReader: libcamera detected %d camera(s): %s",
+                    len(available), [c.get('Model', '?') for c in available])
+
         cam = Picamera2()
 
         # Build config: size + optional rotation via Transform
