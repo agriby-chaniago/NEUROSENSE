@@ -22,9 +22,9 @@ BMP280_I2C_ADDRESS = 0x76
 # Address: 0x57 (fixed by Maxim datasheet)
 MAX30102_I2C_ADDRESS = 0x57
 # SMP_AVE=4 → effective rate = 400/4 = 100 Hz
-# 400 samples @ 100 Hz = 4 detik data → cukup untuk deteksi 2-3 peaks di semua HR range (40-180 BPM)
-# 100 samples (default lama) = 1 detik → hanya 1 peak di 60 BPM → HR tidak akurat
-MAX30102_SAMPLE_BUFFER = 400
+# 200 samples @ 100 Hz = 2 detik data → cukup untuk 2+ cardiac cycles di semua HR range
+# Lebih cepat dari 400 (4 detik), HR/SpO2 muncul lebih cepat untuk keperluan dataset
+MAX30102_SAMPLE_BUFFER = 200
 MAX30102_SAMPLING_RATE_HZ = 400  # Internal sensor sampling rate setting
 
 # ─── Grove GSR Sensor ─────────────────────────────────────────────────────
@@ -103,7 +103,7 @@ CSV_FIELDNAMES = [
 # ─── Dashboard ─────────────────────────────────────────────────────────────
 DASHBOARD_HOST = "0.0.0.0"
 DASHBOARD_PORT = 5000
-DASHBOARD_SSE_INTERVAL_S = 1.0   # How often SSE pushes data to browser
+DASHBOARD_SSE_INTERVAL_S = 0.5   # Push to browser every 500 ms
 
 # ─── Grove Buzzer v1.3 ────────────────────────────────────────────────────
 # Wiring: Colok ke port D5 pada Grove Base HAT

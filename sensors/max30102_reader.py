@@ -73,16 +73,24 @@ class MAX30102Reader(BaseSensor):
             )
             self._last_error = None
 
-            # Update EMA only when reading is valid
-            if hr_valid:
-                self._ema_hr = hr if self._ema_hr is None else \
-                    self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
-            if spo2_valid:
-                self._ema_spo2 = spo2 if self._ema_spo2 is None else \
-                    self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2
+            # Finger removed → hard-reset EMA so display clears to —
+            finger_removed = (hr == -999.0 and not hr_valid)
+            if finger_removed:
+                self._ema_hr   = None
+                self._ema_spo2 = None
+            else:
+                # Update EMA only on valid reads
+                if hr_valid:
+                    self._ema_hr = hr if self._ema_hr is None else \
+                        self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
+                if spo2_valid:
+                    self._ema_spo2 = spo2 if self._ema_spo2 is None else \
+                        self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2
 
-            out_hr   = round(self._ema_hr,   1) if self._ema_hr   is not None and hr_valid   else None
-            out_spo2 = round(self._ema_spo2, 1) if self._ema_spo2 is not None and spo2_valid else None
+            # Show last known EMA even when current read is invalid (e.g. motion)
+            # so the dashboard doesn't flicker back to — on every noisy frame.
+            out_hr   = round(self._ema_hr,   1) if self._ema_hr   is not None else None
+            out_spo2 = round(self._ema_spo2, 1) if self._ema_spo2 is not None else None
 
             result = {
                 "heart_rate_bpm": out_hr,
