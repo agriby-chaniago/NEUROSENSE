@@ -13,7 +13,7 @@ import json
 import logging
 import time
 from typing import Optional
-from flask import Flask, Response, jsonify, render_template, stream_with_context
+from flask import Flask, Response, jsonify, render_template
 
 import config
 
@@ -87,20 +87,20 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
             return Response("Camera not enabled", status=503)
 
         def generate():
-            boundary = b"--frame"
+            interval = 1.0 / max(1, config.CAMERA_FRAMERATE)
             while True:
                 frame = _camera_reader.get_frame()
-                if frame:
+                if frame is not None:
                     yield (
-                        boundary + b"\r\n"
-                        b"Content-Type: image/jpeg\r\n"
-                        b"Content-Length: " + str(len(frame)).encode() + b"\r\n"
-                        b"\r\n" + frame + b"\r\n"
+                        b"--frame\r\n"
+                        b"Content-Type: image/jpeg\r\n\r\n"
+                        + frame
+                        + b"\r\n"
                     )
-                time.sleep(1.0 / max(1, config.CAMERA_FRAMERATE))
+                time.sleep(interval)
 
         return Response(
-            stream_with_context(generate()),
+            generate(),
             mimetype="multipart/x-mixed-replace; boundary=frame",
             headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
         )
