@@ -95,6 +95,16 @@ def calc_hr_and_spo2(
     best_lag = best_idx + lag_min
     best_corr = float(search[best_idx])
 
+    # ── Harmonic check ───────────────────────────────────────────────────────
+    #    The dicrotic notch can make autocorr peak at T/2 (double HR).
+    #    If corr[lag*2] >= 0.5 * corr[lag], the true period is lag*2.
+    doubled_lag = best_lag * 2
+    if doubled_lag <= lag_max:
+        doubled_corr = float(autocorr[doubled_lag])
+        if doubled_corr >= 0.5 * best_corr:
+            best_lag  = doubled_lag
+            best_corr = doubled_corr
+
     import logging as _log
     _log.getLogger(__name__).info(
         "MAX30102 autocorr: best_lag=%d  corr=%.3f  → %.1f BPM",
