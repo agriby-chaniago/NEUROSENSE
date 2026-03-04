@@ -83,6 +83,7 @@ const buf = {
   hum: makeBuffer(),
   pres: makeBuffer(),
   gsr: makeBuffer(),
+  ads: makeBuffer(),
 };
 
 // ── Chart: Heart Rate & SpO2 ─────────────────────────────────────────────
@@ -98,7 +99,7 @@ const chartHR = new Chart(document.getElementById("chart-hr"), {
   options: CHART_OPTIONS("", 40, 105),
 });
 
-// ── Chart: Temperature & Humidity ────────────────────────────────────────
+// ── Chart: Temperature & Humidity ──────────────────────────────────────
 const chartEnv = new Chart(document.getElementById("chart-env"), {
   type: "line",
   data: {
@@ -146,9 +147,20 @@ function updateCards(d) {
   setMetric("val-hr", d.heart_rate_bpm, 0, d.hr_valid);
   setMetric("val-spo2", d.spo2_percent, 1, d.spo2_valid);
   setMetric("val-temp", d.temperature_celsius, 1, true);
-  setMetric("val-hum", d.humidity_percent, 1, true);
+  setMetric(
+    "val-hum",
+    d.humidity_percent,
+    1,
+    d.humidity_percent !== null && d.humidity_percent !== undefined,
+  );
   setMetric("val-pres", d.pressure_hpa, 1, true);
   setMetric("val-gsr", d.gsr_conductance_us, 4, true);
+  setMetric(
+    "val-ads",
+    d.ads1_ch0_V,
+    4,
+    d.ads1_ch0_V !== null && d.ads1_ch0_V !== undefined,
+  );
 }
 
 // ── Alert banner ──────────────────────────────────────
@@ -194,6 +206,7 @@ function connect() {
     pushVal(buf.hum, d.humidity_percent);
     pushVal(buf.pres, d.pressure_hpa);
     pushVal(buf.gsr, d.gsr_conductance_us);
+    pushVal(buf.ads, d.ads1_ch0_V);
 
     chartHR.update();
     chartEnv.update();

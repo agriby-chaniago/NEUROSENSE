@@ -53,9 +53,10 @@ class SensorManager:
         sensor will not prevent the others from starting.
         """
         candidates = {
-            "bme280":   ("sensors.bme280_reader",   "BME280Reader",   config.BME280_INTERVAL_S),
+            "bmp280":   ("sensors.bmp280_reader",   "BMP280Reader",   config.BMP280_INTERVAL_S),
             "max30102": ("sensors.max30102_reader",  "MAX30102Reader", config.MAX30102_INTERVAL_S),
             "gsr":      ("sensors.gsr_reader",       "GSRReader",      config.GSR_INTERVAL_S),
+            "ads1115":  ("sensors.ads1115_reader",   "ADS1115Reader",  config.ADS1115_INTERVAL_S),
         }
 
         for name, (module_path, class_name, interval) in candidates.items():

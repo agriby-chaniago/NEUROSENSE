@@ -10,13 +10,9 @@ from unittest.mock import MagicMock, patch, call
 import pytest
 
 # ── Mock hardware modules so tests run on any machine ────────────────────────
-# smbus2
+# smbus2 (used by MAX30102, BMP280, ADS1115)
 smbus2_mock = MagicMock()
 sys.modules["smbus2"] = smbus2_mock
-
-# RPi.bme280
-bme280_mock = MagicMock()
-sys.modules["bme280"] = bme280_mock
 
 # grove.adc
 grove_pkg  = types.ModuleType("grove")
@@ -144,9 +140,9 @@ class TestCSVLogger:
         logger = CSVLogger(data_dir=str(tmp_path))
         logger.start()
         logger.log({
-            "timestamp_utc":      "2026-03-03T00:00:00+00:00",
-            "schema_version":     "1.0.0",
-            "heart_rate_bpm":     72,
+            "timestamp_utc":       "2026-03-03T00:00:00+00:00",
+            "schema_version":      "1.1.0",
+            "heart_rate_bpm":      72,
             "temperature_celsius": 25.3,
         })
         time.sleep(0.2)   # give writer thread time to flush

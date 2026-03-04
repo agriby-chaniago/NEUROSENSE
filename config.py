@@ -4,18 +4,17 @@ All hardware addresses, GPIO pins, sampling settings, and paths live here.
 Change sensor wiring? Update this file only.
 """
 
-# ─── Schema ──────────────────────────────────────────────────────────────────
-# Bump this when CSV column layout changes so old data can be distinguished.
-DATA_SCHEMA_VERSION = "1.0.0"
-
 # ─── I2C Bus ───────────────────────────────────────────────────────────────
 I2C_BUS = 1   # /dev/i2c-1 (Raspberry Pi standard bus)
 
-# ─── BME280 ────────────────────────────────────────────────────────────────
-# Wiring: SDA→Pin3(GPIO2), SCL→Pin5(GPIO3), VIN→3.3V(Pin1), GND→Pin6
-# Address: 0x76 when SDO→GND, 0x77 when SDO→VCC
-# Verify with: i2cdetect -y 1
-BME280_I2C_ADDRESS = 0x76
+# ─── BMP280 (temperature + pressure, NO humidity) ────────────────────────
+# Wiring:
+#   VCC → 3.3V (Pin 1)    GND → GND (Pin 6)
+#   SDA → GPIO2 (Pin 3)   SCL → GPIO3 (Pin 5)
+#   SDO → GND             → I2C address 0x76  (SDO → 3.3V = 0x77)
+#   CSB → 3.3V            → selects I2C mode (not SPI)
+# Verify: i2cdetect -y 1  → should show 0x76
+BMP280_I2C_ADDRESS = 0x76
 
 # ─── MAX30102 ─────────────────────────────────────────────────────────────
 # Wiring: SDA→Pin3(GPIO2), SCL→Pin5(GPIO3), VIN→3.3V(Pin1), GND→Pin9
@@ -34,32 +33,68 @@ GROVE_HAT_ADC_ADDRESS = 0x04
 GSR_GROVE_CHANNEL = 0    # A0 port = channel 0
 GSR_ADC_BITS = 12        # Grove Base HAT returns 12-bit values (0–4095)
 
+# ─── ADS1115 (Dual 16-bit ADC via I2C) ───────────────────────────────────
+# Wiring (same for both units):
+#   VDD → 3.3V (Pin 1)    GND → GND (Pin 6)
+#   SDA → GPIO2 (Pin 3)   SCL → GPIO3 (Pin 5)
+#   ALRT pin → not connected
+#   Unit 1: ADDR → GND  → address 0x48
+#   Unit 2: ADDR → VDD  → address 0x49
+# Verify: i2cdetect -y 1  → should show 0x48 and 0x49
+ADS1115_1_ADDRESS = 0x48
+ADS1115_2_ADDRESS = 0x49
+
+# Channels to read: list of (i2c_address, channel_0_to_3, label)
+# label = CSV column name. Add/remove entries to configure active channels.
+# Connect analog sensors (EMG, flex, NTC, etc.) to AINx → 3.3V max input!
+ADS1115_CHANNELS = [
+    (0x48, 0, "ads1_ch0_V"),   # ADS1 AIN0 → connect analog sensor here
+    (0x48, 1, "ads1_ch1_V"),   # ADS1 AIN1 → spare
+    (0x49, 0, "ads2_ch0_V"),   # ADS2 AIN0 → connect analog sensor here
+    (0x49, 1, "ads2_ch1_V"),   # ADS2 AIN1 → spare
+]
+
 # ─── Sensor Manager ───────────────────────────────────────────────────────
 # How often (seconds) each sensor thread reads a new value
-BME280_INTERVAL_S   = 2.0
+BMP280_INTERVAL_S   = 2.0
 MAX30102_INTERVAL_S = 4.0   # Longer — needs to collect buffer of samples
 GSR_INTERVAL_S      = 0.5
+ADS1115_INTERVAL_S  = 0.5
 
 # ─── Data Logging ──────────────────────────────────────────────────────────
 import os
 DATA_DIR = os.path.join(os.path.dirname(__file__), "data")
 
 # CSV columns — order matters for readability
+# Bump DATA_SCHEMA_VERSION when this list changes (e.g. "1.1.0").
+# humidity_percent removed: BMP280 does not have a humidity sensor.
+DATA_SCHEMA_VERSION = "1.1.0"
+
 CSV_FIELDNAMES = [
     "timestamp_utc",
     "schema_version",
+    # ── MAX30102 ──
     "heart_rate_bpm",
     "spo2_percent",
     "hr_valid",
     "spo2_valid",
+    # ── BMP280 / BME280 ──
+    # humidity_percent: float for BME280, None (empty in CSV) for BMP280
     "temperature_celsius",
     "humidity_percent",
     "pressure_hpa",
+    # ── Grove GSR ──
     "gsr_raw_adc",
     "gsr_resistance_ohm",
-    "gsr_conductance_us",  # microSiemens (EDA signal)
-    "alert_active",        # True jika ada kondisi bahaya saat pembacaan ini
-    "alert_reasons",       # deskripsi kondisi bahaya, dipisah koma
+    "gsr_conductance_us",   # microSiemens (EDA signal)
+    # ── ADS1115 (extend by adding channel labels from ADS1115_CHANNELS) ──
+    "ads1_ch0_V",
+    "ads1_ch1_V",
+    "ads2_ch0_V",
+    "ads2_ch1_V",
+    # ── Alerts ──
+    "alert_active",         # True jika ada kondisi bahaya saat pembacaan ini
+    "alert_reasons",        # deskripsi kondisi bahaya, dipisah koma
 ]
 
 # ─── Dashboard ─────────────────────────────────────────────────────────────
@@ -104,7 +139,8 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 # sensor_manager reads this dict — adding a new sensor only needs a new key here
 # and a corresponding reader class.
 ACTIVE_SENSORS = {
-    "bme280":   True,
+    "bmp280":   True,
     "max30102": True,
     "gsr":      True,
+    "ads1115":  False,  # Set True setelah ADS1115 tersambung ke Pi
 }
