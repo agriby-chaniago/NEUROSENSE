@@ -138,13 +138,13 @@ def calc_hr_and_spo2(
     doubled_lag = best_lag * 2
     if doubled_lag <= lag_max:
         doubled_corr = float(autocorr[doubled_lag])
-        # For best_lag ≤ 65 (reported HR > 92 BPM): with only ~2 cycles in a
-        # 200-sample buffer the autocorr at T can go slightly negative due to
-        # noise, so the "> 0" guard incorrectly blocks the doubling.
-        # A resting HR > 92 BPM sitting still is extremely unusual; the cause
-        # is almost always a T/2 dicrotic-notch peak. Double unconditionally.
-        # For normal HR range (best_lag > 65) keep the 0.10 guard.
-        if best_lag <= 65 or doubled_corr >= 0.10 * best_corr:
+        # For best_lag ≤ harmonic_min_lag (reported HR > 92 BPM): autocorr at T
+        # can go slightly negative due to noise with short buffers, so the
+        # "> 0" guard incorrectly blocks doubling. Double unconditionally below
+        # this threshold. harmonic_min_lag is proportional to sampling_freq,
+        # e.g. at fs=25: int(25*60/92)=16; at fs=100: int(100*60/92)=65.
+        harmonic_min_lag = int(sampling_freq * 60.0 / 92.0)
+        if best_lag <= harmonic_min_lag or doubled_corr >= 0.10 * best_corr:
             best_lag  = doubled_lag
             best_corr = doubled_corr
 

@@ -4,8 +4,8 @@ Uses polling mode (no INT pin) — compatible with Raspberry Pi 5.
 
 Sliding-window ring buffer: collects STEP_SIZE new samples per call,
 runs the HR/SpO2 algorithm on the latest SAMPLE_BUFFER samples.
-First result appears after SAMPLE_BUFFER samples (~3 s at 100 Hz);
-subsequent results appear every STEP_SIZE samples (~1 s).
+First result appears after SAMPLE_BUFFER samples (~12 s at 25 Hz FIFO);
+subsequent results appear every STEP_SIZE samples (~1 s at 25 Hz).
 """
 
 import collections
@@ -17,8 +17,8 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# New samples collected per read() call.  Smaller = faster updates but more CPU.
-_STEP_SIZE = 100   # ~1 s at 100 Hz effective
+# Effective FIFO rate = 25 Hz (SR=100 Hz / SMP_AVE=4) → 25 samples = 1 s per step.
+_STEP_SIZE = 25   # ~1 s at 25 Hz FIFO
 
 
 class MAX30102Reader(BaseSensor):

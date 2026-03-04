@@ -21,11 +21,12 @@ BMP280_I2C_ADDRESS = 0x76
 # INT pin NOT used (polling mode — avoids Pi 5 GPIO interrupt issues)
 # Address: 0x57 (fixed by Maxim datasheet)
 MAX30102_I2C_ADDRESS = 0x57
-# SMP_AVE=4 → effective rate = 400/4 = 100 Hz
-# 300 samples @ 100 Hz = 3 detik data → 3 cardiac cycles minimum pada 60 BPM
-# (lag=100). Autocorr jauh lebih stabil dengan 3 siklus vs 2 siklus (200 samples).
+# REG_SPO2_CONFIG=0x27: bits[4:2]=001 → SR=100 Hz. SMP_AVE=4 → FIFO=25 Hz.
+# Empirically confirmed: 100 samples ≈ 4s → 25 Hz effective output rate.
+# SMP_AVE=4 → effective rate = 100/4 = 25 Hz
+# 300 samples @ 25 Hz = 12s history → 3+ cardiac cycles minimum pada 60 BPM
 MAX30102_SAMPLE_BUFFER = 300
-MAX30102_SAMPLING_RATE_HZ = 400  # Internal sensor sampling rate setting
+MAX30102_SAMPLING_RATE_HZ = 100  # REG_SPO2_CONFIG=0x27 bits[4:2]=001 → SR=100 Hz
 
 # ─── Grove GSR Sensor ─────────────────────────────────────────────────────
 # Wiring: Plug Grove cable into A0 port on Grove Base HAT
