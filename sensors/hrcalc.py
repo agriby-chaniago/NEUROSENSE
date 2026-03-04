@@ -75,74 +75,43 @@ def calc_hr_and_spo2(
     ir_ac  = ir  - ir_mean
     red_ac = red - red_mean
 
-    # ── 2. Lowpass filter — single 15-pt MA (150 ms at 100 Hz) ─────────────
-    #    Enough to attenuate the dicrotic notch (250-350 ms after systolic)
-    #    without merging adjacent cardiac peaks (600+ ms apart at 100 BPM).
-    kernel = np.ones(15) / 15.0
-    ir_smooth = np.convolve(ir_ac, kernel, mode='same')
+    # ── 2. HR via autocorrelation ───────────────────────────────────────────
+    #    Autocorrelation finds the dominant period of the PPG signal directly.
+    #    It is completely immune to the dicrotic notch because it averages
+    #    over all cycles and only cares about periodicity, not peak shape.
+    #
+    #    Search lag range: 0.33 s–1.5 s → 40–180 BPM at 100 Hz
+    lag_min = int(sampling_freq * 0.33)   # 33 samples → 182 BPM max
+    lag_max = int(sampling_freq * 1.5)    # 150 samples → 40 BPM min
+    lag_max = min(lag_max, n // 2)
 
-    # ── 3. Peak detection ───────────────────────────────────────────────────
-    #    min_distance=0.5 s → max 120 BPM. Dicrotic notch is always < 0.4 s
-    #    after the systolic peak so this guard window safely excludes it.
-    peaks = _find_peaks(ir_smooth, min_distance=int(sampling_freq * 0.5))
+    # Normalised autocorrelation
+    autocorr = np.correlate(ir_ac, ir_ac, mode='full')
+    autocorr = autocorr[n - 1:]          # keep lags 0, 1, 2, …
+    autocorr /= (autocorr[0] + 1e-9)     # normalise to 1.0 at lag=0
 
-    if len(peaks) < 2:
+    # Find the largest peak in the valid lag range
+    search = autocorr[lag_min:lag_max + 1]
+    if search.size == 0:
         return -999.0, False, -999.0, False
 
-    # ── 4. Reject low-amplitude peaks (secondary / noise peaks) ────────────
-    #    Keep only peaks that are at least 40% of the tallest peak.
-    #    The dicrotic notch is typically 20-35% of systolic amplitude.
-    peak_heights = np.array([ir_smooth[p] for p in peaks])
-    max_height   = float(np.max(peak_heights))
-    peaks = [p for p, h in zip(peaks, peak_heights) if h >= 0.4 * max_height]
-
-    if len(peaks) < 2:
-        return -999.0, False, -999.0, False
-
-    # ── 5. Interval outlier rejection ──────────────────────────────────────
-    #    Discard any peak whose interval to the prior accepted peak is less
-    #    than 60% of the median — catches any still-surviving spurious peak.
-    intervals_raw  = np.diff(peaks)
-    median_interval = float(np.median(intervals_raw))
-    good_peaks = [peaks[0]]
-    for i in range(1, len(peaks)):
-        if (peaks[i] - good_peaks[-1]) >= 0.6 * median_interval:
-            good_peaks.append(peaks[i])
-    peaks = good_peaks
-
-    if len(peaks) < 2:
-        return -999.0, False, -999.0, False
-
-    # ── 5. Heart rate ───────────────────────────────────────────────────────
-    intervals = np.diff(peaks)  # in samples
-    avg_interval_samples = np.mean(intervals)
-    hr_bpm = (sampling_freq / avg_interval_samples) * 60.0
+    best_lag = int(np.argmax(search)) + lag_min
+    hr_bpm   = (sampling_freq / best_lag) * 60.0
     hr_valid = 30 <= hr_bpm <= 180
 
-    # ── 6. SpO2 via ratio-of-ratios (cycle-by-cycle peak-to-trough) ────────
-    cycle_ac_ir:  list[float] = []
-    cycle_ac_red: list[float] = []
-    for i in range(1, len(peaks)):
-        seg_ir  = ir_smooth[peaks[i - 1]:peaks[i] + 1]
-        seg_red = red_ac[peaks[i - 1]:peaks[i] + 1]
-        pp_ir   = float(ir_smooth[peaks[i]] - np.min(seg_ir))
-        pp_red  = float(red_ac[peaks[i]] - np.min(seg_red))
-        if pp_ir > 0 and pp_red > 0:
-            cycle_ac_ir.append(pp_ir)
-            cycle_ac_red.append(pp_red)
+    # ── 3. SpO2 via RMS ratio-of-ratios ────────────────────────────────────
+    #    R = (RMS_red / DC_red) / (RMS_ir / DC_ir)
+    #    RMS of the AC signal is more stable than peak-to-trough over short
+    #    windows and is unaffected by the dicrotic notch.
+    rms_ir  = float(np.sqrt(np.mean(ir_ac  ** 2)))
+    rms_red = float(np.sqrt(np.mean(red_ac ** 2)))
 
-    if not cycle_ac_ir or ir_mean < 1.0 or red_mean < 1.0:
+    if rms_ir < 1.0 or red_mean < 1.0:
         return hr_bpm, hr_valid, -999.0, False
 
-    ac_ir  = float(np.mean(cycle_ac_ir))
-    ac_red = float(np.mean(cycle_ac_red))
-
-    if ac_ir < 1.0:
-        return hr_bpm, hr_valid, -999.0, False
-
-    r = (ac_red / red_mean) / (ac_ir / ir_mean)
-    r_idx = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
-    spo2  = float(_SPO2_TABLE[r_idx])
+    r = (rms_red / red_mean) / (rms_ir / ir_mean)
+    r_idx    = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
+    spo2     = float(_SPO2_TABLE[r_idx])
     spo2_valid = hr_valid and (70.0 <= spo2 <= 100.0)
 
     return round(hr_bpm, 1), hr_valid, spo2, spo2_valid
