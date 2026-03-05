@@ -191,20 +191,11 @@ class CameraReader:
 
         frame_us = int(1_000_000 / max(1, config.CAMERA_FRAMERATE))
 
-        # Try hardware MJPEG for lores first — Pi 5 PiSP encodes JPEG in ISP,
-        # meaning capture_array("lores") returns a ready JPEG buffer (zero CPU).
-        # Fall back to YUV420 + software cv2 encode on older firmware.
-        lores_fmt = "MJPEG"
-        try:
-            _test_cfg = cam.create_video_configuration(
-                main={"size": (config.CAMERA_WIDTH, config.CAMERA_HEIGHT), "format": "RGB888"},
-                lores={"size": (sw, sh), "format": "MJPEG"},
-            )
-            cam.configure(_test_cfg)
-            logger.info("CameraReader: ISP hardware MJPEG lores supported")
-        except Exception:
-            lores_fmt = "YUV420"
-            logger.info("CameraReader: hardware MJPEG not supported, using YUV420")
+        # PiSP (Pi 5) only supports YUV formats for lores — MJPEG is unsupported
+        # and causes a hard FATAL crash (not catchable by Python try/except).
+        # YUV420 is the fastest native lores format; cv2.cvtColor to BGR is SIMD-
+        # accelerated and typically takes <1 ms for 640×360.
+        lores_fmt = "YUV420"
 
         video_cfg = cam.create_video_configuration(
             main={
@@ -221,7 +212,7 @@ class CameraReader:
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
             },
-            buffer_count=6,   # deeper buffer = ISP never stalls waiting for consumer
+            buffer_count=6,
         )
 
         # Apply rotation if configured
@@ -276,27 +267,21 @@ class CameraReader:
                 _use_cv2 = False
 
             rotation = getattr(config, "CAMERA_ROTATION", 0)
-            hw_mjpeg = (lores_fmt == "MJPEG")
             jpeg_q   = config.CAMERA_JPEG_QUALITY
 
             # ── Encode thread ───────────────────────────────────────────
             # Separating capture (ISP-bound) from encode (CPU-bound) lets the
             # ISP keep running full-speed even when cv2 encode takes >1 frame.
-            # queue maxsize=1: if encode falls behind, always drop the OLDER
-            # frame (keep the newest) — minimises visual latency.
+            # queue maxsize=1: always drop the OLDER frame, keep the newest.
             _enc_q: queue.Queue = queue.Queue(maxsize=1)
 
             def _encode_worker():
                 while True:
-                    item = _enc_q.get()
-                    if item is None:   # poison pill — stop signal
+                    raw = _enc_q.get()
+                    if raw is None:   # poison pill — stop signal
                         break
-                    raw, is_hw = item
                     try:
-                        if is_hw:
-                            # Hardware MJPEG: raw bytes are already a valid JPEG
-                            jpeg_bytes = bytes(raw)
-                        elif _use_cv2:
+                        if _use_cv2:
                             bgr = _cv2.cvtColor(raw, _cv2.COLOR_YUV420p2BGR)
                             if rotation == 90:
                                 bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
@@ -310,7 +295,7 @@ class CameraReader:
                             )
                             jpeg_bytes = buf.tobytes()
                         else:
-                            jpeg_bytes = None   # should not happen
+                            jpeg_bytes = None   # cv2 not available
 
                         if jpeg_bytes:
                             with self._cond:
@@ -326,18 +311,17 @@ class CameraReader:
             _enc_thread.start()
 
             while self._running:
-                raw = cam.capture_array("lores")
+                raw = cam.capture_array("lores")   # YUV420 from ISP
 
-                # Non-blocking put: if encode queue is full, discard the OLDER
-                # item and enqueue the fresh frame (always show latest).
+                # Non-blocking put: drop stale frame if encode can't keep up
                 try:
-                    _enc_q.put_nowait((raw, hw_mjpeg))
+                    _enc_q.put_nowait(raw)
                 except queue.Full:
                     try:
-                        _enc_q.get_nowait()   # drop stale frame
+                        _enc_q.get_nowait()   # discard old frame
                     except queue.Empty:
                         pass
-                    _enc_q.put_nowait((raw, hw_mjpeg))
+                    _enc_q.put_nowait(raw)
 
         finally:
             # Send poison pill and wait briefly for encode thread
