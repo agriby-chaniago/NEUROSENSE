@@ -169,9 +169,10 @@ CAMERA_SHARPNESS     = 2.0
 CAMERA_AUTOFOCUS     = True
 
 # R↔B channel swap.
-# Arducam 64MP (format RGB888): data sudah dalam urutan RGB yang benar → False.
-# Jika kulit masih biru setelah restart, ganti ke True.
-CAMERA_SWAP_RB       = False
+# OV64A40 (Arducam 64MP) via PiSP backend mengirim data BGR meskipun format
+# yang diminta RGB888 — ini bug/quirk driver libcamera + PiSP.
+# → CAMERA_SWAP_RB = True wajib untuk kamera ini.
+CAMERA_SWAP_RB       = True
 
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
