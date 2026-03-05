@@ -42,10 +42,7 @@ SESSION_SENSOR_FIELDS = [
     "gsr_conductance_us",
 ]
 
-CONDITION_LABELS = getattr(
-    config, "EXPERIMENT_CONDITIONS",
-    ["normal", "anxiety", "stress", "depression"],
-)
+
 
 
 class SessionManager:
@@ -77,7 +74,6 @@ class SessionManager:
     def start_session(
         self,
         respondent_id: str,
-        condition_label: str,
         duration_sec: int = None,
     ) -> dict:
         """
@@ -90,7 +86,6 @@ class SessionManager:
         Raises
         ------
         RuntimeError  – if another session is already active
-        ValueError    – if condition_label is unknown
         """
         with self._lock:
             if self._active is not None:
@@ -98,12 +93,6 @@ class SessionManager:
                     "Another session is already active. "
                     f"Stop session {self._active['metadata']['session_id']} first."
                 )
-
-        if condition_label not in CONDITION_LABELS:
-            raise ValueError(
-                f"Unknown condition '{condition_label}'. "
-                f"Valid values: {CONDITION_LABELS}"
-            )
 
         if duration_sec is None:
             duration_sec = int(
@@ -121,7 +110,6 @@ class SessionManager:
         metadata = {
             "session_id":      session_id,
             "respondent_id":   respondent_id,
-            "condition_label": condition_label,
             "duration_sec":    duration_sec,
             "started_at_utc":  started_at.isoformat(),
             "stopped_at_utc":  None,
@@ -167,8 +155,8 @@ class SessionManager:
             t.start()
 
         logger.info(
-            "Session %s started — respondent=%s  condition=%s  duration=%ds",
-            session_id, respondent_id, condition_label, duration_sec,
+            "Session %s started — respondent=%s  duration=%ds",
+            session_id, respondent_id, duration_sec,
         )
         return metadata
 

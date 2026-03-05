@@ -15,23 +15,26 @@
       }
 
       :root {
-        --bg: #0d1117;
-        --card-bg: #161b22;
-        --border: #30363d;
-        --text: #e6edf3;
-        --muted: #8b949e;
-        --accent: #58a6ff;
-        --green: #3fb950;
-        --red: #f85149;
-        --yellow: #d29922;
-        --purple: #bc8cff;
+        --bg: #f0f4f8;
+        --card-bg: #ffffff;
+        --border: #d0d9e4;
+        --text: #1a2b3c;
+        --muted: #52697e;
+        --accent: #1a5fad;
+        --green: #1e7845;
+        --red: #b71c1c;
+        --yellow: #c25d00;
+        --purple: #5e35b1;
+        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
       }
 
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         padding: 1.5rem;
+        font-size: 0.92rem;
       }
 
       header {
@@ -39,16 +42,17 @@
         align-items: center;
         gap: 1rem;
         margin-bottom: 1.5rem;
-        border-bottom: 1px solid var(--border);
-        padding-bottom: 1rem;
+        border-bottom: 2px solid var(--accent);
+        padding-bottom: 0.85rem;
       }
       header h1 {
-        font-size: 1.4rem;
+        font-size: 1.25rem;
         font-weight: 700;
         color: var(--accent);
+        letter-spacing: -0.02em;
       }
       header p {
-        font-size: 0.8rem;
+        font-size: 0.75rem;
         color: var(--muted);
       }
 
@@ -59,10 +63,11 @@
         background: var(--muted);
         flex-shrink: 0;
         transition: background 0.4s;
+        border: 2px solid rgba(26, 43, 60, 0.12);
       }
       #status-dot.live {
         background: var(--green);
-        box-shadow: 0 0 6px var(--green);
+        border-color: rgba(30, 120, 69, 0.3);
       }
       #status-dot.error {
         background: var(--red);
@@ -71,9 +76,10 @@
       /* ── Alert banner ─────────────────────────────────── */
       #alert-banner {
         display: none;
-        background: rgba(248, 81, 73, 0.12);
-        border: 1px solid var(--red);
-        border-radius: 8px;
+        background: #fdecea;
+        border: 1px solid #e8a09a;
+        border-left: 4px solid var(--red);
+        border-radius: 6px;
         padding: 0.75rem 1rem;
         margin-bottom: 1.25rem;
         color: var(--red);
@@ -81,20 +87,9 @@
         font-weight: 600;
         align-items: center;
         gap: 0.6rem;
-        animation: pulse-border 1s ease-in-out infinite alternate;
       }
       #alert-banner.visible {
         display: flex;
-      }
-      @keyframes pulse-border {
-        from {
-          border-color: var(--red);
-          box-shadow: 0 0 0 rgba(248, 81, 73, 0);
-        }
-        to {
-          border-color: #ff8080;
-          box-shadow: 0 0 8px rgba(248, 81, 73, 0.4);
-        }
       }
 
       /* ── Big metric cards ─────────────────────────────── */
@@ -110,12 +105,14 @@
         border-radius: 10px;
         padding: 1rem;
         text-align: center;
+        box-shadow: var(--shadow);
       }
       .metric-card .label {
-        font-size: 0.72rem;
+        font-size: 0.7rem;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.06em;
+        font-weight: 600;
       }
       .metric-card .value {
         font-size: 2rem;
@@ -124,29 +121,29 @@
         margin: 0.3rem 0;
       }
       .metric-card .unit {
-        font-size: 0.78rem;
+        font-size: 0.75rem;
         color: var(--muted);
       }
       .metric-card.hr .value {
-        color: var(--red);
+        color: #b71c1c;
       }
       .metric-card.spo2 .value {
-        color: var(--accent);
+        color: #1a5fad;
       }
       .metric-card.temp .value {
-        color: var(--yellow);
+        color: #c25d00;
       }
       .metric-card.hum .value {
-        color: var(--green);
+        color: #1e7845;
       }
       .metric-card.ads .value {
-        color: #56d364;
+        color: #00796b;
       }
       .metric-card.pres .value {
-        color: var(--purple);
+        color: #5e35b1;
       }
       .metric-card.gsr .value {
-        color: #79c0ff;
+        color: #0277bd;
       }
 
       /* ── Recalibrate button ───────────────────────────── */
@@ -157,20 +154,20 @@
         font-weight: 600;
         letter-spacing: 0.03em;
         cursor: pointer;
-        border: 1px solid #30363d;
-        border-radius: 6px;
-        background: #21262d;
-        color: #79c0ff;
+        border: 1px solid var(--border);
+        border-radius: 5px;
+        background: #eef3fb;
+        color: var(--accent);
         transition:
-          background 0.2s,
-          border-color 0.2s;
+          background 0.15s,
+          border-color 0.15s;
       }
       .btn-recal:hover:not(:disabled) {
-        background: #2d333b;
-        border-color: #79c0ff;
+        background: #dde9f8;
+        border-color: var(--accent);
       }
       .btn-recal:disabled {
-        opacity: 0.5;
+        opacity: 0.45;
         cursor: not-allowed;
       }
       #recal-status {
@@ -180,13 +177,13 @@
         min-height: 1rem;
       }
       #recal-status.ok {
-        color: #3fb950;
+        color: var(--green);
       }
       #recal-status.err {
-        color: #f85149;
+        color: var(--red);
       }
       #recal-status.busy {
-        color: #d29922;
+        color: var(--yellow);
       }
 
       .invalid {
@@ -204,12 +201,14 @@
         border: 1px solid var(--border);
         border-radius: 10px;
         padding: 1rem 1.25rem 1.25rem;
+        box-shadow: var(--shadow);
       }
       .chart-card h3 {
-        font-size: 0.82rem;
+        font-size: 0.75rem;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.07em;
+        font-weight: 600;
         margin-bottom: 0.75rem;
       }
       .chart-card canvas {
@@ -221,6 +220,8 @@
         text-align: center;
         font-size: 0.72rem;
         color: var(--muted);
+        padding-top: 1rem;
+        border-top: 1px solid var(--border);
       }
 
       /* ── Camera feed ───────────────────────────────── */
@@ -230,12 +231,14 @@
         border-radius: 10px;
         padding: 1rem 1.25rem 1.25rem;
         margin-bottom: 1.5rem;
+        box-shadow: var(--shadow);
       }
       .camera-card h3 {
-        font-size: 0.82rem;
+        font-size: 0.75rem;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.07em;
+        font-weight: 600;
         margin-bottom: 0.75rem;
       }
       .camera-card .camera-inner {
@@ -249,7 +252,7 @@
         max-width: 640px;
         border-radius: 6px;
         border: 1px solid var(--border);
-        background: #000;
+        background: #e8ecf0;
         display: block;
       }
       #camera-status {
@@ -258,6 +261,27 @@
       }
       #camera-status.error {
         color: var(--red);
+      }
+
+      /* ── Nav links in header ──────────────────────────── */
+      .nav-btn-primary {
+        color: var(--accent);
+        font-size: 0.82rem;
+        text-decoration: none;
+        background: #e8f0fb;
+        border: 1px solid var(--accent);
+        border-radius: 6px;
+        padding: 0.3rem 0.8rem;
+        font-weight: 600;
+      }
+      .nav-btn-secondary {
+        color: var(--muted);
+        font-size: 0.82rem;
+        text-decoration: none;
+        padding: 0.3rem 0.8rem;
+      }
+      .nav-btn-secondary:hover {
+        color: var(--accent);
       }
     </style>
   </head>
@@ -269,31 +293,8 @@
         <p id="last-update">Waiting for data…</p>
       </div>
       <nav style="margin-left: auto; display: flex; gap: 1rem">
-        <a
-          href="/experiment"
-          style="
-            color: var(--accent);
-            font-size: 0.82rem;
-            text-decoration: none;
-            background: rgba(88, 166, 255, 0.1);
-            border: 1px solid var(--accent);
-            border-radius: 6px;
-            padding: 0.3rem 0.8rem;
-          "
-        >
-          🧪 Experiment
-        </a>
-        <a
-          href="/experiment/sessions"
-          style="
-            color: var(--muted);
-            font-size: 0.82rem;
-            text-decoration: none;
-            padding: 0.3rem 0.8rem;
-          "
-        >
-          📋 Sessions
-        </a>
+        <a href="/experiment" class="nav-btn-primary">🧪 Experiment</a>
+        <a href="/experiment/sessions" class="nav-btn-secondary">📋 Sessions</a>
       </nav>
     </header>
 

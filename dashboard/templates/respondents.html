@@ -13,44 +13,55 @@
         padding: 0;
       }
       :root {
-        --bg: #0d1117;
-        --card-bg: #161b22;
-        --border: #30363d;
-        --text: #e6edf3;
-        --muted: #8b949e;
-        --accent: #58a6ff;
-        --green: #3fb950;
-        --red: #f85149;
-        --yellow: #d29922;
+        --bg: #f0f4f8;
+        --card-bg: #ffffff;
+        --border: #d0d9e4;
+        --text: #1a2b3c;
+        --muted: #52697e;
+        --accent: #1a5fad;
+        --green: #1e7845;
+        --red: #b71c1c;
+        --yellow: #c25d00;
+        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
       }
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         padding: 1.5rem;
+        font-size: 0.92rem;
       }
       nav {
         display: flex;
         gap: 1.5rem;
         margin-bottom: 1.5rem;
         padding-bottom: 0.75rem;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 2px solid var(--accent);
         align-items: center;
       }
       nav a {
         color: var(--muted);
         text-decoration: none;
-        font-size: 0.88rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.2rem 0;
+        border-bottom: 2px solid transparent;
       }
-      nav a:hover,
-      nav a.active {
+      nav a:hover {
         color: var(--accent);
       }
+      nav a.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+        font-weight: 600;
+      }
       nav h1 {
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         font-weight: 700;
         color: var(--accent);
         margin-right: auto;
+        letter-spacing: -0.02em;
       }
       .card {
         background: var(--card-bg);
@@ -58,18 +69,20 @@
         border-radius: 8px;
         padding: 1.25rem;
         margin-bottom: 1rem;
+        box-shadow: var(--shadow);
       }
       .card h2 {
-        font-size: 0.95rem;
-        font-weight: 600;
+        font-size: 0.72rem;
+        font-weight: 700;
         margin-bottom: 1rem;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
       }
       label {
         display: block;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
+        font-weight: 600;
         color: var(--muted);
         margin-bottom: 0.3rem;
       }
@@ -77,17 +90,19 @@
       select {
         width: 100%;
         padding: 0.5rem 0.75rem;
-        background: #0d1117;
+        background: #f8fafc;
         border: 1px solid var(--border);
         border-radius: 6px;
         color: var(--text);
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         margin-bottom: 0.75rem;
+        transition: border-color 0.15s;
       }
       input:focus,
       select:focus {
         outline: none;
         border-color: var(--accent);
+        background: #fff;
       }
       .row {
         display: grid;
@@ -105,7 +120,7 @@
       }
       .btn-green {
         background: var(--green);
-        color: #000;
+        color: #fff;
       }
       .btn-red {
         background: var(--red);
@@ -113,7 +128,7 @@
         border: none;
       }
       .btn-muted {
-        background: #21262d;
+        background: #f0f4f8;
         color: var(--text);
         border: 1px solid var(--border);
         text-decoration: none;
@@ -126,26 +141,31 @@
       th {
         text-align: left;
         color: var(--muted);
-        font-weight: 500;
+        font-weight: 600;
+        font-size: 0.75rem;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
         padding: 0.5rem 0.75rem;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 2px solid var(--border);
+        background: #f8fafc;
       }
       td {
         padding: 0.6rem 0.75rem;
-        border-bottom: 1px solid #21262d;
+        border-bottom: 1px solid #eaeff5;
       }
       tr:last-child td {
         border-bottom: none;
       }
       tr:hover td {
-        background: #1c2128;
+        background: #f5f8fc;
       }
       .error {
         color: var(--red);
         font-size: 0.85rem;
         margin-bottom: 0.75rem;
-        background: rgba(248, 81, 73, 0.08);
-        border: 1px solid var(--red);
+        background: #fdecea;
+        border: 1px solid #e8a09a;
+        border-left: 3px solid var(--red);
         border-radius: 6px;
         padding: 0.5rem 0.75rem;
       }

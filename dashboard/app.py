@@ -191,14 +191,11 @@ def create_app(
             return Response("Experiment module not initialised", status=503)
         respondents = rr.get_all()
         active      = sm.get_active_session()
-        conditions  = getattr(config, "EXPERIMENT_CONDITIONS",
-                              ["normal", "anxiety", "stress", "depression"])
         duration    = getattr(config, "EXPERIMENT_SESSION_DURATION_S", 60)
         return render_template(
             "experiment.html",
             respondents=respondents,
             active_session=active,
-            conditions=conditions,
             default_duration=duration,
         )
 
@@ -281,14 +278,13 @@ def create_app(
             return jsonify({"status": "error", "message": "Module not ready"}), 503
         data         = request.get_json(silent=True) or request.form
         respondent   = data.get("respondent_id", "")
-        condition    = data.get("condition_label", "")
         duration_raw = data.get("duration_sec", None)
         duration     = int(duration_raw) if duration_raw else None
-        if not respondent or not condition:
+        if not respondent:
             return jsonify({"status": "error",
-                            "message": "respondent_id and condition_label required"}), 400
+                            "message": "respondent_id required"}), 400
         try:
-            meta = sm.start_session(respondent, condition, duration_sec=duration)
+            meta = sm.start_session(respondent, duration_sec=duration)
             # If form POST (browser), redirect back to experiment page
             if request.form:
                 return redirect(url_for("experiment"))

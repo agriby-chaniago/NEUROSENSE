@@ -10,10 +10,10 @@ const MAX_POINTS = 60; // rolling window (60 data points ≈ 60 s at 1 Hz)
 const RECONNECT_MS = 3000; // reconnect delay after SSE error
 
 // ── Chart defaults ────────────────────────────────────────────────────────
-Chart.defaults.color = "#8b949e";
-Chart.defaults.borderColor = "#30363d";
+Chart.defaults.color = "#52697e";
+Chart.defaults.borderColor = "#d0d9e4";
 Chart.defaults.font.family =
-  '-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif';
+  '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif';
 Chart.defaults.font.size = 11;
 
 const CHART_OPTIONS = (yLabel, suggestedMin, suggestedMax) => ({
@@ -23,15 +23,17 @@ const CHART_OPTIONS = (yLabel, suggestedMin, suggestedMax) => ({
   plugins: {
     legend: { labels: { boxWidth: 12, padding: 14 } },
     tooltip: {
-      backgroundColor: "#161b22",
-      borderColor: "#30363d",
+      backgroundColor: "#ffffff",
+      titleColor: "#1a2b3c",
+      bodyColor: "#52697e",
+      borderColor: "#d0d9e4",
       borderWidth: 1,
     },
   },
   scales: {
-    x: { grid: { color: "#21262d" }, ticks: { maxTicksLimit: 8 } },
+    x: { grid: { color: "#e8edf3" }, ticks: { maxTicksLimit: 8 } },
     y: {
-      grid: { color: "#21262d" },
+      grid: { color: "#e8edf3" },
       title: { display: !!yLabel, text: yLabel },
       suggestedMin,
       suggestedMax,
@@ -92,8 +94,8 @@ const chartHR = new Chart(document.getElementById("chart-hr"), {
   data: {
     labels,
     datasets: [
-      makeDataset("Heart Rate (BPM)", "#f85149", buf.hr),
-      makeDataset("SpO₂ (%)", "#58a6ff", buf.spo2),
+      makeDataset("Heart Rate (BPM)", "#b71c1c", buf.hr),
+      makeDataset("SpO\u2082 (%)", "#1a5fad", buf.spo2),
     ],
   },
   options: CHART_OPTIONS("", 40, 105),
@@ -105,8 +107,8 @@ const chartEnv = new Chart(document.getElementById("chart-env"), {
   data: {
     labels,
     datasets: [
-      makeDataset("Temperature (°C)", "#d29922", buf.temp),
-      makeDataset("Humidity (%RH)", "#3fb950", buf.hum),
+      makeDataset("Temperature (\u00b0C)", "#c25d00", buf.temp),
+      makeDataset("Humidity (%RH)", "#1e7845", buf.hum),
     ],
   },
   options: CHART_OPTIONS("", 0, 100),
@@ -117,7 +119,7 @@ const chartPres = new Chart(document.getElementById("chart-pres"), {
   type: "line",
   data: {
     labels,
-    datasets: [makeDataset("Pressure (hPa)", "#bc8cff", buf.pres)],
+    datasets: [makeDataset("Pressure (hPa)", "#5e35b1", buf.pres)],
   },
   options: CHART_OPTIONS("hPa", 950, 1060),
 });
@@ -127,7 +129,7 @@ const chartGSR = new Chart(document.getElementById("chart-gsr"), {
   type: "line",
   data: {
     labels,
-    datasets: [makeDataset("Conductance (µS)", "#79c0ff", buf.gsr)],
+    datasets: [makeDataset("Conductance (µS)", "#0277bd", buf.gsr)],
   },
   options: CHART_OPTIONS("µS", 0, 50),
 });

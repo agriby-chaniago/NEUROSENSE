@@ -13,45 +13,56 @@
         padding: 0;
       }
       :root {
-        --bg: #0d1117;
-        --card-bg: #161b22;
-        --border: #30363d;
-        --text: #e6edf3;
-        --muted: #8b949e;
-        --accent: #58a6ff;
-        --green: #3fb950;
-        --red: #f85149;
-        --yellow: #d29922;
-        --purple: #bc8cff;
+        --bg: #f0f4f8;
+        --card-bg: #ffffff;
+        --border: #d0d9e4;
+        --text: #1a2b3c;
+        --muted: #52697e;
+        --accent: #1a5fad;
+        --green: #1e7845;
+        --red: #b71c1c;
+        --yellow: #c25d00;
+        --purple: #5e35b1;
+        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
       }
       body {
         background: var(--bg);
         color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        font-family:
+          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
         padding: 1.5rem;
+        font-size: 0.92rem;
       }
       nav {
         display: flex;
         gap: 1.5rem;
         margin-bottom: 1.5rem;
         padding-bottom: 0.75rem;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 2px solid var(--accent);
         align-items: center;
       }
       nav a {
         color: var(--muted);
         text-decoration: none;
-        font-size: 0.88rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.2rem 0;
+        border-bottom: 2px solid transparent;
       }
-      nav a:hover,
-      nav a.active {
+      nav a:hover {
         color: var(--accent);
       }
+      nav a.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+        font-weight: 600;
+      }
       nav h1 {
-        font-size: 1.2rem;
+        font-size: 1.15rem;
         font-weight: 700;
         color: var(--accent);
         margin-right: auto;
+        letter-spacing: -0.02em;
       }
       .card {
         background: var(--card-bg);
@@ -59,36 +70,40 @@
         border-radius: 8px;
         padding: 1.25rem;
         margin-bottom: 1rem;
+        box-shadow: var(--shadow);
       }
       .card h2 {
-        font-size: 0.95rem;
-        font-weight: 600;
+        font-size: 0.72rem;
+        font-weight: 700;
         margin-bottom: 1rem;
         color: var(--muted);
         text-transform: uppercase;
-        letter-spacing: 0.05em;
+        letter-spacing: 0.08em;
       }
       label {
         display: block;
-        font-size: 0.8rem;
+        font-size: 0.78rem;
+        font-weight: 600;
         color: var(--muted);
-        margin-bottom: 0.25rem;
+        margin-bottom: 0.3rem;
       }
       select,
       input {
         width: 100%;
         padding: 0.5rem 0.75rem;
-        background: #0d1117;
+        background: #f8fafc;
         border: 1px solid var(--border);
         border-radius: 6px;
         color: var(--text);
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         margin-bottom: 0.75rem;
+        transition: border-color 0.15s;
       }
       select:focus,
       input:focus {
         outline: none;
         border-color: var(--accent);
+        background: #fff;
       }
       .row {
         display: flex;
@@ -102,13 +117,14 @@
         padding: 0.55rem 1.25rem;
         border: none;
         border-radius: 6px;
-        font-size: 0.9rem;
+        font-size: 0.88rem;
         font-weight: 600;
         cursor: pointer;
+        letter-spacing: 0.01em;
       }
       .btn-green {
         background: var(--green);
-        color: #000;
+        color: #fff;
       }
       .btn-red {
         background: var(--red);
@@ -116,12 +132,16 @@
       }
       .btn-accent {
         background: var(--accent);
-        color: #000;
+        color: #fff;
       }
       .btn-muted {
-        background: #21262d;
+        background: #f0f4f8;
         color: var(--text);
         border: 1px solid var(--border);
+        text-decoration: none;
+      }
+      .btn-muted:hover {
+        background: #e4eaf1;
       }
       button:disabled {
         opacity: 0.4;
@@ -129,21 +149,21 @@
       }
       .pill {
         display: inline-block;
-        padding: 0.2rem 0.6rem;
-        border-radius: 12px;
-        font-size: 0.75rem;
-        font-weight: 600;
+        padding: 0.18rem 0.55rem;
+        border-radius: 10px;
+        font-size: 0.72rem;
+        font-weight: 700;
       }
       .pill-green {
-        background: rgba(63, 185, 80, 0.15);
+        background: #e6f4ed;
         color: var(--green);
       }
       .pill-red {
-        background: rgba(248, 81, 73, 0.15);
+        background: #fdecea;
         color: var(--red);
       }
       .pill-yellow {
-        background: rgba(210, 153, 34, 0.15);
+        background: #fef3e2;
         color: var(--yellow);
       }
       /* Recording status banner */
@@ -151,8 +171,9 @@
         display: none;
         align-items: center;
         gap: 0.75rem;
-        background: rgba(248, 81, 73, 0.1);
-        border: 1px solid var(--red);
+        background: #fdecea;
+        border: 1px solid #e8a09a;
+        border-left: 4px solid var(--red);
         border-radius: 8px;
         padding: 1rem 1.25rem;
         margin-bottom: 1rem;
@@ -166,6 +187,7 @@
         border-radius: 50%;
         background: var(--red);
         animation: blink 1s ease-in-out infinite;
+        flex-shrink: 0;
       }
       @keyframes blink {
         50% {
@@ -176,23 +198,25 @@
         flex: 1;
       }
       #rec-info strong {
-        font-size: 1rem;
+        font-size: 0.95rem;
+        color: var(--red);
       }
       #rec-info small {
         color: var(--muted);
-        font-size: 0.8rem;
+        font-size: 0.78rem;
         display: block;
+        margin-top: 0.15rem;
       }
       #rec-bar-wrap {
         width: 100%;
-        height: 6px;
-        background: var(--border);
+        height: 5px;
+        background: #f0d0cf;
         border-radius: 3px;
         margin-top: 0.5rem;
       }
       #rec-bar {
         width: 0%;
-        height: 6px;
+        height: 5px;
         background: var(--red);
         border-radius: 3px;
         transition: width 0.5s;
@@ -223,9 +247,8 @@
       <div id="rec-dot"></div>
       <div id="rec-info">
         <strong id="rec-title">
-          {% if active_session %} REC — {{ active_session.respondent_id }} / {{
-          active_session.condition_label }} ({{ active_session.session_id }}) {%
-          endif %}
+          {% if active_session %} REC — {{ active_session.respondent_id }} ({{
+          active_session.session_id }}) {% endif %}
         </strong>
         <small id="rec-sub">
           {% if active_session %} {{ active_session.elapsed_sec }}s / {{
@@ -265,14 +288,6 @@
             {% endfor %}
           </select>
 
-          <label>Condition</label>
-          <select name="condition_label" required>
-            <option value="">— select —</option>
-            {% for c in conditions %}
-            <option value="{{ c }}">{{ c|capitalize }}</option>
-            {% endfor %}
-          </select>
-
           <label>Duration (seconds)</label>
           <input
             type="number"
@@ -299,10 +314,20 @@
         </form>
         {% if not respondents %}
         <p
-          style="color: var(--yellow); font-size: 0.82rem; margin-top: 0.75rem"
+          style="
+            color: var(--yellow);
+            font-size: 0.82rem;
+            margin-top: 0.75rem;
+            background: #fef3e2;
+            padding: 0.5rem 0.75rem;
+            border-radius: 5px;
+            border-left: 3px solid var(--yellow);
+          "
         >
           ⚠ No respondents registered yet.
-          <a href="/experiment/respondents" style="color: var(--accent)"
+          <a
+            href="/experiment/respondents"
+            style="color: var(--accent); font-weight: 600"
             >Add one →</a
           >
         </p>
@@ -315,7 +340,12 @@
         <img
           src="/camera/stream"
           alt="camera stream"
-          style="width: 100%; border-radius: 6px; background: #000"
+          style="
+            width: 100%;
+            border-radius: 6px;
+            background: #e8ecf0;
+            border: 1px solid var(--border);
+          "
           onerror="
             this.style.display = 'none';
             document.getElementById('cam-err').style.display = 'block';
@@ -370,7 +400,7 @@
             }
             banner.classList.add("show");
             document.getElementById("rec-title").textContent =
-              `REC — ${s.respondent_id} / ${s.condition_label} (${s.session_id})`;
+              `REC — ${s.respondent_id} (${s.session_id})`;
             document.getElementById("rec-sub").textContent =
               `${s.elapsed_sec}s / ${s.duration_sec}s`;
             const pct = Math.min(
