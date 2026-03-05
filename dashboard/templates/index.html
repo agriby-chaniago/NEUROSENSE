@@ -51,9 +51,11 @@
         color: var(--accent);
         letter-spacing: -0.02em;
       }
-      header p {
-        font-size: 0.75rem;
+      #last-update {
+        font-size: 0.72rem;
         color: var(--muted);
+        white-space: nowrap;
+        margin-right: auto;
       }
 
       #status-dot {
@@ -265,7 +267,6 @@
 
       /* ── Nav links in header ──────────────────────────── */
       header nav {
-        margin-left: auto;
         display: flex;
         gap: 1.5rem;
         align-items: center;
@@ -291,10 +292,8 @@
   <body>
     <header>
       <div id="status-dot"></div>
-      <div>
-        <h1>NEUROSENSE</h1>
-        <p id="last-update">Waiting for data…</p>
-      </div>
+      <h1>NEUROSENSE</h1>
+      <span id="last-update">Waiting for data…</span>
       <nav>
         <a href="/" class="active">Dashboard</a>
         <a href="/experiment">Experiment</a>
