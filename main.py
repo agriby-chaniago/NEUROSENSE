@@ -19,6 +19,8 @@ import config
 from logging_module.csv_logger import CSVLogger
 from sensors.sensor_manager import SensorManager
 from dashboard.app import create_app
+from experiments.session_manager import SessionManager
+from experiments.respondent_registry import RespondentRegistry
 
 
 # ── Logging setup ────────────────────────────────────────────────────────────
@@ -75,8 +77,21 @@ def main():
     # ── Give sensors a moment to get first readings ────────────────────
     time.sleep(2)
 
-    # ── Create Flask app ────────────────────────────────────────────────
-    app = create_app(sensor_manager, camera_reader=camera_reader)
+    # ── Initialise experiment modules ────────────────────────────────
+    respondent_registry = RespondentRegistry()
+    session_manager     = SessionManager(
+        sensor_manager=sensor_manager,
+        camera_reader=camera_reader,
+    )
+    logger.info("SessionManager and RespondentRegistry initialised")
+
+    # ── Create Flask app ────────────────────────────────────────
+    app = create_app(
+        sensor_manager,
+        camera_reader=camera_reader,
+        session_manager=session_manager,
+        respondent_registry=respondent_registry,
+    )
 
     # ── Graceful shutdown on Ctrl+C / SIGTERM ────────────────────────────
     def shutdown(signum, frame):

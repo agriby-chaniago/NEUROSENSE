@@ -189,6 +189,13 @@ CAMERA_SWAP_RB       = True
 CAMERA_FIXED_EXPOSURE_US = 0       # microseconds; 0 = AE enabled
 CAMERA_ANALOGUE_GAIN     = 2.0     # analogue gain when fixed-exposure is active
 
+# ─── Experiment Settings ───────────────────────────────────────────────────
+# All experiment data is saved under DATA_DIR/sessions/{session_id}/
+EXPERIMENT_CONDITIONS        = ["normal", "anxiety", "stress", "depression"]
+EXPERIMENT_SESSION_DURATION_S = 60          # default recording duration per session
+EXPERIMENT_RESPONDENTS_FILE  = os.path.join(DATA_DIR, "respondents.json")
+EXPERIMENT_SESSIONS_DIR      = os.path.join(DATA_DIR, "sessions")
+
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
 # sensor_manager reads this dict — adding a new sensor only needs a new key here

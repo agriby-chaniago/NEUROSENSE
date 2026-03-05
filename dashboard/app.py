@@ -3,39 +3,66 @@ dashboard/app.py  –  Flask web dashboard with Server-Sent Events (SSE).
 
 Routes
 ------
-GET /           → dashboard HTML page
-GET /stream     → SSE stream (data pushed every DASHBOARD_SSE_INTERVAL_S)
-GET /health     → JSON health check for all sensors
-GET /snapshot   → JSON single latest reading (useful for debugging)
+GET  /                              → dashboard HTML page
+GET  /stream                        → SSE stream
+GET  /health                        → JSON health check
+GET  /camera/stream                 → MJPEG live video
+GET  /camera/snapshot               → high-res JPEG
+
+Experiment routes
+-----------------
+GET  /experiment                    → session control panel
+GET  /experiment/respondents        → respondent management
+POST /experiment/respondents/add    → register new respondent
+DEL  /experiment/respondents/<id>   → delete respondent
+GET  /experiment/sessions           → all sessions list
+GET  /experiment/session/<id>       → session detail JSON
+GET  /experiment/session/active     → active session JSON
+POST /experiment/session/start      → start recording session
+POST /experiment/session/stop       → stop recording session
 """
 
 import json
 import logging
 import time
 from typing import Optional
-from flask import Flask, Response, jsonify, render_template, stream_with_context
+from flask import (
+    Flask, Response, jsonify, redirect, render_template,
+    request, stream_with_context, url_for,
+)
 
 import config
 
 logger = logging.getLogger(__name__)
 
 # Injected by main.py after startup
-_sensor_manager = None
-_camera_reader: Optional[object] = None
+_sensor_manager    = None
+_camera_reader:    Optional[object] = None
+_session_manager:  Optional[object] = None
+_respondent_registry: Optional[object] = None
 
 
-def create_app(sensor_manager, camera_reader=None) -> Flask:
+def create_app(
+    sensor_manager,
+    camera_reader=None,
+    session_manager=None,
+    respondent_registry=None,
+) -> Flask:
     """
     Factory function — creates and configures the Flask app.
 
     Parameters
     ----------
-    sensor_manager : SensorManager
-        Already-started SensorManager instance.
+    sensor_manager      : SensorManager         (required)
+    camera_reader       : CameraReader          (optional)
+    session_manager     : SessionManager        (optional)
+    respondent_registry : RespondentRegistry    (optional)
     """
-    global _sensor_manager, _camera_reader
-    _sensor_manager = sensor_manager
-    _camera_reader  = camera_reader
+    global _sensor_manager, _camera_reader, _session_manager, _respondent_registry
+    _sensor_manager      = sensor_manager
+    _camera_reader       = camera_reader
+    _session_manager     = session_manager
+    _respondent_registry = respondent_registry
 
     app = Flask(__name__, template_folder="templates", static_folder="static")
     app.config["SECRET_KEY"] = "neurosense-dev-key"
@@ -145,5 +172,145 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
         except Exception as exc:
             logger.error("Recalibrate '%s' failed: %s", sensor_name, exc)
             return jsonify({"status": "error", "message": str(exc)}), 500
+
+    # ──────────────────────────────────────────────────────────────────
+    # Experiment routes
+    # ──────────────────────────────────────────────────────────────────
+
+    def _require_sm():
+        """Return (session_manager, respondent_registry) or raise 503."""
+        if _session_manager is None or _respondent_registry is None:
+            return None, None
+        return _session_manager, _respondent_registry
+
+    @app.route("/experiment")
+    def experiment():
+        """Main experiment control panel."""
+        sm, rr = _require_sm()
+        if sm is None:
+            return Response("Experiment module not initialised", status=503)
+        respondents = rr.get_all()
+        active      = sm.get_active_session()
+        conditions  = getattr(config, "EXPERIMENT_CONDITIONS",
+                              ["normal", "anxiety", "stress", "depression"])
+        duration    = getattr(config, "EXPERIMENT_SESSION_DURATION_S", 60)
+        return render_template(
+            "experiment.html",
+            respondents=respondents,
+            active_session=active,
+            conditions=conditions,
+            default_duration=duration,
+        )
+
+    @app.route("/experiment/respondents")
+    def experiment_respondents():
+        """Respondent management page."""
+        sm, rr = _require_sm()
+        if rr is None:
+            return Response("Experiment module not initialised", status=503)
+        return render_template(
+            "respondents.html",
+            respondents=rr.get_all(),
+            next_id=rr.next_id(),
+        )
+
+    @app.route("/experiment/respondents/add", methods=["POST"])
+    def experiment_respondents_add():
+        """Register a new respondent (form POST)."""
+        sm, rr = _require_sm()
+        if rr is None:
+            return jsonify({"status": "error", "message": "Module not ready"}), 503
+        rid    = request.form.get("respondent_id", "").strip().upper()
+        gender = request.form.get("gender", "M").strip().upper()
+        age    = request.form.get("age", "0").strip()
+        notes  = request.form.get("notes", "").strip()
+        try:
+            if not rid:
+                rid = rr.next_id()
+            rr.add(rid, gender, int(age), notes)
+            return redirect(url_for("experiment_respondents"))
+        except ValueError as exc:
+            return render_template(
+                "respondents.html",
+                respondents=rr.get_all(),
+                next_id=rr.next_id(),
+                error=str(exc),
+            ), 400
+
+    @app.route("/experiment/respondents/<respondent_id>", methods=["DELETE"])
+    def experiment_respondents_delete(respondent_id: str):
+        sm, rr = _require_sm()
+        if rr is None:
+            return jsonify({"status": "error"}), 503
+        deleted = rr.delete(respondent_id)
+        return jsonify({"status": "ok" if deleted else "not_found"})
+
+    @app.route("/experiment/sessions")
+    def experiment_sessions():
+        """All sessions list."""
+        sm, rr = _require_sm()
+        if sm is None:
+            return Response("Experiment module not initialised", status=503)
+        sessions = sm.list_sessions()
+        return render_template("sessions.html", sessions=sessions)
+
+    @app.route("/experiment/session/active")
+    def experiment_session_active():
+        """JSON: active session info (or null)."""
+        sm, _ = _require_sm()
+        if sm is None:
+            return jsonify(None)
+        return jsonify(sm.get_active_session())
+
+    @app.route("/experiment/session/<session_id>")
+    def experiment_session_detail(session_id: str):
+        """JSON: metadata for a specific session."""
+        sm, _ = _require_sm()
+        if sm is None:
+            return jsonify({"status": "error"}), 503
+        meta = sm.get_session(session_id)
+        if meta is None:
+            return jsonify({"status": "not_found"}), 404
+        return jsonify(meta)
+
+    @app.route("/experiment/session/start", methods=["POST"])
+    def experiment_session_start():
+        """Start a new recording session (JSON or form POST)."""
+        sm, _ = _require_sm()
+        if sm is None:
+            return jsonify({"status": "error", "message": "Module not ready"}), 503
+        data         = request.get_json(silent=True) or request.form
+        respondent   = data.get("respondent_id", "")
+        condition    = data.get("condition_label", "")
+        duration_raw = data.get("duration_sec", None)
+        duration     = int(duration_raw) if duration_raw else None
+        if not respondent or not condition:
+            return jsonify({"status": "error",
+                            "message": "respondent_id and condition_label required"}), 400
+        try:
+            meta = sm.start_session(respondent, condition, duration_sec=duration)
+            # If form POST (browser), redirect back to experiment page
+            if request.form:
+                return redirect(url_for("experiment"))
+            return jsonify({"status": "ok", "session": meta})
+        except (RuntimeError, ValueError) as exc:
+            if request.form:
+                return redirect(url_for("experiment"))
+            return jsonify({"status": "error", "message": str(exc)}), 400
+
+    @app.route("/experiment/session/stop", methods=["POST"])
+    def experiment_session_stop():
+        """Stop the active recording session."""
+        sm, _ = _require_sm()
+        if sm is None:
+            return jsonify({"status": "error", "message": "Module not ready"}), 503
+        meta = sm.stop_session()
+        if meta is None:
+            if request.form:
+                return redirect(url_for("experiment"))
+            return jsonify({"status": "error", "message": "No active session"}), 400
+        if request.form:
+            return redirect(url_for("experiment_sessions"))
+        return jsonify({"status": "ok", "session": meta})
 
     return app

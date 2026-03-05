@@ -1,0 +1,387 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEUROSENSE — Experiment Control</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0d1117;
+        --card-bg: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --yellow: #d29922;
+        --purple: #bc8cff;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 1.5rem;
+      }
+      nav {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        align-items: center;
+      }
+      nav a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.88rem;
+      }
+      nav a:hover,
+      nav a.active {
+        color: var(--accent);
+      }
+      nav h1 {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--accent);
+        margin-right: auto;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+      .card h2 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.25rem;
+      }
+      select,
+      input {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: #0d1117;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+      }
+      select:focus,
+      input:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .row {
+        display: flex;
+        gap: 0.75rem;
+      }
+      .row > * {
+        flex: 1;
+      }
+      button,
+      .btn {
+        padding: 0.55rem 1.25rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.9rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-green {
+        background: var(--green);
+        color: #000;
+      }
+      .btn-red {
+        background: var(--red);
+        color: #fff;
+      }
+      .btn-accent {
+        background: var(--accent);
+        color: #000;
+      }
+      .btn-muted {
+        background: #21262d;
+        color: var(--text);
+        border: 1px solid var(--border);
+      }
+      button:disabled {
+        opacity: 0.4;
+        cursor: not-allowed;
+      }
+      .pill {
+        display: inline-block;
+        padding: 0.2rem 0.6rem;
+        border-radius: 12px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+      .pill-green {
+        background: rgba(63, 185, 80, 0.15);
+        color: var(--green);
+      }
+      .pill-red {
+        background: rgba(248, 81, 73, 0.15);
+        color: var(--red);
+      }
+      .pill-yellow {
+        background: rgba(210, 153, 34, 0.15);
+        color: var(--yellow);
+      }
+      /* Recording status banner */
+      #rec-banner {
+        display: none;
+        align-items: center;
+        gap: 0.75rem;
+        background: rgba(248, 81, 73, 0.1);
+        border: 1px solid var(--red);
+        border-radius: 8px;
+        padding: 1rem 1.25rem;
+        margin-bottom: 1rem;
+      }
+      #rec-banner.show {
+        display: flex;
+      }
+      #rec-dot {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--red);
+        animation: blink 1s ease-in-out infinite;
+      }
+      @keyframes blink {
+        50% {
+          opacity: 0;
+        }
+      }
+      #rec-info {
+        flex: 1;
+      }
+      #rec-info strong {
+        font-size: 1rem;
+      }
+      #rec-info small {
+        color: var(--muted);
+        font-size: 0.8rem;
+        display: block;
+      }
+      #rec-bar-wrap {
+        width: 100%;
+        height: 6px;
+        background: var(--border);
+        border-radius: 3px;
+        margin-top: 0.5rem;
+      }
+      #rec-bar {
+        width: 0%;
+        height: 6px;
+        background: var(--red);
+        border-radius: 3px;
+        transition: width 0.5s;
+      }
+      .grid2 {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1rem;
+      }
+      @media (max-width: 640px) {
+        .grid2 {
+          grid-template-columns: 1fr;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <h1>NEUROSENSE</h1>
+      <a href="/">Dashboard</a>
+      <a href="/experiment" class="active">Experiment</a>
+      <a href="/experiment/respondents">Respondents</a>
+      <a href="/experiment/sessions">Sessions</a>
+    </nav>
+
+    <!-- Recording banner (visible when a session is active) -->
+    <div id="rec-banner" {% if active_session %}class="show" {% endif %}>
+      <div id="rec-dot"></div>
+      <div id="rec-info">
+        <strong id="rec-title">
+          {% if active_session %} REC — {{ active_session.respondent_id }} / {{
+          active_session.condition_label }} ({{ active_session.session_id }}) {%
+          endif %}
+        </strong>
+        <small id="rec-sub">
+          {% if active_session %} {{ active_session.elapsed_sec }}s / {{
+          active_session.duration_sec }}s {% endif %}
+        </small>
+        <div id="rec-bar-wrap">
+          <div
+            id="rec-bar"
+            {%
+            if
+            active_session
+            %}
+            style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"
+            {%
+            endif
+            %}
+          ></div>
+        </div>
+      </div>
+      <form method="POST" action="/experiment/session/stop" style="margin: 0">
+        <button class="btn-red" type="submit">Stop</button>
+      </form>
+    </div>
+
+    <div class="grid2">
+      <!-- Start Session -->
+      <div class="card">
+        <h2>Start New Session</h2>
+        <form method="POST" action="/experiment/session/start">
+          <label>Respondent</label>
+          <select name="respondent_id" required>
+            <option value="">— select —</option>
+            {% for r in respondents %}
+            <option value="{{ r.respondent_id }}">
+              {{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y
+            </option>
+            {% endfor %}
+          </select>
+
+          <label>Condition</label>
+          <select name="condition_label" required>
+            <option value="">— select —</option>
+            {% for c in conditions %}
+            <option value="{{ c }}">{{ c|capitalize }}</option>
+            {% endfor %}
+          </select>
+
+          <label>Duration (seconds)</label>
+          <input
+            type="number"
+            name="duration_sec"
+            value="{{ default_duration }}"
+            min="5"
+            max="600"
+          />
+
+          <button
+            class="btn-green"
+            type="submit"
+            {%
+            if
+            active_session
+            %}disabled
+            title="Stop current session first"
+            {%
+            endif
+            %}
+          >
+            ▶ Start Recording
+          </button>
+        </form>
+        {% if not respondents %}
+        <p
+          style="color: var(--yellow); font-size: 0.82rem; margin-top: 0.75rem"
+        >
+          ⚠ No respondents registered yet.
+          <a href="/experiment/respondents" style="color: var(--accent)"
+            >Add one →</a
+          >
+        </p>
+        {% endif %}
+      </div>
+
+      <!-- Live camera preview -->
+      <div class="card">
+        <h2>Live Camera</h2>
+        <img
+          src="/camera/stream"
+          alt="camera stream"
+          style="width: 100%; border-radius: 6px; background: #000"
+          onerror="
+            this.style.display = 'none';
+            document.getElementById('cam-err').style.display = 'block';
+          "
+        />
+        <p
+          id="cam-err"
+          style="
+            display: none;
+            color: var(--muted);
+            font-size: 0.82rem;
+            margin-top: 0.5rem;
+          "
+        >
+          Camera not available.
+        </p>
+      </div>
+    </div>
+
+    <!-- Recent sessions shortcut -->
+    <div class="card">
+      <h2>Quick links</h2>
+      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap">
+        <a
+          href="/experiment/respondents"
+          class="btn btn-muted"
+          style="text-decoration: none"
+          >👥 Manage Respondents</a
+        >
+        <a
+          href="/experiment/sessions"
+          class="btn btn-muted"
+          style="text-decoration: none"
+          >📋 All Sessions</a
+        >
+        <a href="/" class="btn btn-muted" style="text-decoration: none"
+          >📊 Sensor Dashboard</a
+        >
+      </div>
+    </div>
+
+    <script>
+      // Poll active session and update banner every second
+      function pollActive() {
+        fetch("/experiment/session/active")
+          .then((r) => r.json())
+          .then((s) => {
+            const banner = document.getElementById("rec-banner");
+            if (!s) {
+              banner.classList.remove("show");
+              return;
+            }
+            banner.classList.add("show");
+            document.getElementById("rec-title").textContent =
+              `REC — ${s.respondent_id} / ${s.condition_label} (${s.session_id})`;
+            document.getElementById("rec-sub").textContent =
+              `${s.elapsed_sec}s / ${s.duration_sec}s`;
+            const pct = Math.min(
+              100,
+              Math.round((s.elapsed_sec / s.duration_sec) * 100),
+            );
+            document.getElementById("rec-bar").style.width = pct + "%";
+          })
+          .catch(() => {});
+      }
+      setInterval(pollActive, 1000);
+    </script>
+  </body>
+</html>

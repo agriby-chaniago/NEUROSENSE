@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>NEUROSENSE — Respondents</title>
+    <style>
+      *,
+      *::before,
+      *::after {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      :root {
+        --bg: #0d1117;
+        --card-bg: #161b22;
+        --border: #30363d;
+        --text: #e6edf3;
+        --muted: #8b949e;
+        --accent: #58a6ff;
+        --green: #3fb950;
+        --red: #f85149;
+        --yellow: #d29922;
+      }
+      body {
+        background: var(--bg);
+        color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        padding: 1.5rem;
+      }
+      nav {
+        display: flex;
+        gap: 1.5rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.75rem;
+        border-bottom: 1px solid var(--border);
+        align-items: center;
+      }
+      nav a {
+        color: var(--muted);
+        text-decoration: none;
+        font-size: 0.88rem;
+      }
+      nav a:hover,
+      nav a.active {
+        color: var(--accent);
+      }
+      nav h1 {
+        font-size: 1.2rem;
+        font-weight: 700;
+        color: var(--accent);
+        margin-right: auto;
+      }
+      .card {
+        background: var(--card-bg);
+        border: 1px solid var(--border);
+        border-radius: 8px;
+        padding: 1.25rem;
+        margin-bottom: 1rem;
+      }
+      .card h2 {
+        font-size: 0.95rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+      }
+      label {
+        display: block;
+        font-size: 0.8rem;
+        color: var(--muted);
+        margin-bottom: 0.3rem;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 0.5rem 0.75rem;
+        background: #0d1117;
+        border: 1px solid var(--border);
+        border-radius: 6px;
+        color: var(--text);
+        font-size: 0.9rem;
+        margin-bottom: 0.75rem;
+      }
+      input:focus,
+      select:focus {
+        outline: none;
+        border-color: var(--accent);
+      }
+      .row {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+        gap: 0.75rem;
+      }
+      button,
+      .btn {
+        padding: 0.5rem 1.1rem;
+        border: none;
+        border-radius: 6px;
+        font-size: 0.88rem;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      .btn-green {
+        background: var(--green);
+        color: #000;
+      }
+      .btn-red {
+        background: var(--red);
+        color: #fff;
+        border: none;
+      }
+      .btn-muted {
+        background: #21262d;
+        color: var(--text);
+        border: 1px solid var(--border);
+        text-decoration: none;
+      }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.88rem;
+      }
+      th {
+        text-align: left;
+        color: var(--muted);
+        font-weight: 500;
+        padding: 0.5rem 0.75rem;
+        border-bottom: 1px solid var(--border);
+      }
+      td {
+        padding: 0.6rem 0.75rem;
+        border-bottom: 1px solid #21262d;
+      }
+      tr:last-child td {
+        border-bottom: none;
+      }
+      tr:hover td {
+        background: #1c2128;
+      }
+      .error {
+        color: var(--red);
+        font-size: 0.85rem;
+        margin-bottom: 0.75rem;
+        background: rgba(248, 81, 73, 0.08);
+        border: 1px solid var(--red);
+        border-radius: 6px;
+        padding: 0.5rem 0.75rem;
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <h1>NEUROSENSE</h1>
+      <a href="/">Dashboard</a>
+      <a href="/experiment">Experiment</a>
+      <a href="/experiment/respondents" class="active">Respondents</a>
+      <a href="/experiment/sessions">Sessions</a>
+    </nav>
+
+    <!-- Register form -->
+    <div class="card">
+      <h2>Register Respondent</h2>
+      {% if error %}
+      <div class="error">{{ error }}</div>
+      {% endif %}
+      <form method="POST" action="/experiment/respondents/add">
+        <div class="row">
+          <div>
+            <label>ID (auto-filled if blank)</label>
+            <input
+              type="text"
+              name="respondent_id"
+              placeholder="{{ next_id }}"
+              pattern="R\d{3}"
+            />
+          </div>
+          <div>
+            <label>Gender</label>
+            <select name="gender">
+              <option value="M">M — Male</option>
+              <option value="F">F — Female</option>
+            </select>
+          </div>
+          <div>
+            <label>Age</label>
+            <input
+              type="number"
+              name="age"
+              placeholder="22"
+              min="10"
+              max="99"
+              required
+            />
+          </div>
+          <div>
+            <label>Notes (optional)</label>
+            <input
+              type="text"
+              name="notes"
+              placeholder="e.g. left-handed, glasses"
+            />
+          </div>
+        </div>
+        <button class="btn-green" type="submit">+ Register</button>
+      </form>
+    </div>
+
+    <!-- Respondent list -->
+    <div class="card">
+      <h2>Registered Respondents ({{ respondents|length }})</h2>
+      {% if respondents %}
+      <table>
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>Gender</th>
+            <th>Age</th>
+            <th>Notes</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in respondents %}
+          <tr>
+            <td><strong>{{ r.respondent_id }}</strong></td>
+            <td>{{ r.gender }}</td>
+            <td>{{ r.age }}</td>
+            <td style="color: var(--muted)">{{ r.notes or '—' }}</td>
+            <td>
+              <button
+                class="btn-red"
+                onclick="deletResp('{{ r.respondent_id }}', this)"
+              >
+                Delete
+              </button>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}
+      <p style="color: var(--muted); font-size: 0.88rem">
+        No respondents registered yet.
+      </p>
+      {% endif %}
+    </div>
+
+    <script>
+      function deletResp(id, btn) {
+        if (!confirm("Delete " + id + "?")) return;
+        fetch("/experiment/respondents/" + id, { method: "DELETE" })
+          .then((r) => r.json())
+          .then((d) => {
+            if (d.status === "ok") btn.closest("tr").remove();
+            else alert("Error: " + d.status);
+          });
+      }
+    </script>
+  </body>
+</html>
