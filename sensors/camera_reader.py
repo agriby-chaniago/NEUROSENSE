@@ -49,6 +49,7 @@ class CameraReader:
         self._thread: Optional[threading.Thread] = None
         self._backend: Optional[str] = None   # "picamera2" | "opencv"
         self._error: Optional[str] = None     # last fatal error message
+        self._cam = None   # picamera2 Picamera2 instance (set after start)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -93,6 +94,29 @@ class CameraReader:
                 timeout=timeout,
             )
             return self._frame
+
+    def capture_snapshot(self) -> Optional[bytes]:
+        """
+        Capture a single high-res JPEG from the main stream (full 1920×1080).
+        Blocks briefly (~100ms). Returns None if camera not ready.
+        Used by /camera/snapshot route.
+        """
+        cam = self._cam
+        if cam is None:
+            return self.get_frame()   # fallback to latest lores frame
+        try:
+            import cv2 as _cv2
+            array = cam.capture_array("main")
+            if getattr(config, "CAMERA_SWAP_RB", False):
+                array = array[:, :, ::-1].copy()
+            bgr = array[:, :, ::-1]
+            _, buf = _cv2.imencode(
+                ".jpg", bgr,
+                [_cv2.IMWRITE_JPEG_QUALITY, 92],   # higher quality for snapshots
+            )
+            return buf.tobytes()
+        except Exception:
+            return self.get_frame()
 
     @property
     def backend(self) -> Optional[str]:
@@ -157,18 +181,24 @@ class CameraReader:
 
         cam = Picamera2()
 
-        # Build config: size + rotation
+        # ── Dual-stream config ────────────────────────────────────────
+        # main  = full 1920×1080 — used for /camera/snapshot (high quality)
+        # lores = small stream  — used for MJPEG live view (ISP hardware scale)
+        # The ISP downscales lores for FREE — no extra CPU cost.
+        sw = getattr(config, "CAMERA_STREAM_WIDTH",  640)
+        sh = getattr(config, "CAMERA_STREAM_HEIGHT", 360)
+
         frame_us = int(1_000_000 / max(1, config.CAMERA_FRAMERATE))
         video_cfg = cam.create_video_configuration(
             main={
-                # Request RGB888.  Arducam 64MP ISP delivers RGB byte order.
-                # If skin appears blue, set CAMERA_SWAP_RB = True in config.py.
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
                 "format": "RGB888",
             },
+            lores={
+                "size":   (sw, sh),
+                "format": "YUV420",   # native ISP output — no colour conversion needed
+            },
             controls={
-                # Allow dynamic range: libcamera picks the fastest achievable
-                # rate up to CAMERA_FRAMERATE. Avoids hard-locking to one fps.
                 "FrameDurationLimits": (frame_us, frame_us * 3),
                 "AwbEnable": True,
                 "AeEnable":  True,
@@ -194,6 +224,7 @@ class CameraReader:
 
         cam.configure(video_cfg)
         cam.start()
+        self._cam = cam   # expose to capture_snapshot()
 
         # ── Autofocus (Arducam 64MP AF / OV64A40) ────────────────────────
         # Must be called AFTER cam.start(). Integer constants used to avoid
@@ -227,46 +258,79 @@ class CameraReader:
                 from PIL import Image  # type: ignore
                 _use_cv2 = False
 
+            rotation = getattr(config, "CAMERA_ROTATION", 0)
+
             while self._running:
-                array = cam.capture_array("main")
+                # Capture from lores stream (small, ISP-downscaled) for fast MJPEG.
+                # Falls back to main if lores unavailable.
+                try:
+                    array = cam.capture_array("lores")
+                    is_lores = True
+                except Exception:
+                    array = cam.capture_array("main")
+                    is_lores = False
 
                 # ── Colour channel handling ───────────────────────────────
-                if array.ndim == 3 and array.shape[2] == 4:
-                    # XBGR/BGRA — strip alpha, then R↔B swap
-                    array = array[:, :, :3][:, :, ::-1].copy()
-                elif getattr(config, "CAMERA_SWAP_RB", False):
-                    array = array[:, :, ::-1].copy()
-                # else: RGB correct as-is
-
-                # ── Software rotation ──────────────────────────────────
-                rotation = getattr(config, "CAMERA_ROTATION", 0)
-
-                # ── JPEG encoding ─────────────────────────────────────
-                if _use_cv2:
-                    # cv2 expects BGR; array is RGB — flip channels
-                    bgr = array[:, :, ::-1]
-                    if rotation == 90:
-                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
-                    elif rotation == 180:
-                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
-                    elif rotation == 270:
-                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
-                    _, buf = _cv2.imencode(
-                        ".jpg", bgr,
-                        [_cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
-                    )
-                    jpeg_bytes = buf.tobytes()
+                if is_lores:
+                    # YUV420 — convert to BGR with cv2 (fast hardware-friendly path)
+                    if _use_cv2:
+                        bgr = _cv2.cvtColor(array, _cv2.COLOR_YUV420p2BGR)
+                        if rotation == 90:
+                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
+                        elif rotation == 180:
+                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
+                        elif rotation == 270:
+                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
+                        _, buf = _cv2.imencode(
+                            ".jpg", bgr,
+                            [_cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
+                        )
+                        jpeg_bytes = buf.tobytes()
+                    else:
+                        # PIL fallback: convert YUV manually via cv2-less path
+                        from PIL import Image  # type: ignore
+                        import numpy as np
+                        h, w = array.shape[0] * 2 // 3, array.shape[1]
+                        y = array[:h, :]
+                        u = array[h:h + h//4, :].reshape(h//2, w//2)
+                        v = array[h + h//4:, :].reshape(h//2, w//2)
+                        u = np.repeat(np.repeat(u, 2, axis=0), 2, axis=1)
+                        v = np.repeat(np.repeat(v, 2, axis=0), 2, axis=1)
+                        yuv = np.stack([y, u, v], axis=2).astype(np.float32)
+                        rgb = np.clip(
+                            yuv @ [[1,0,1.402],[1,-0.344,-0.714],[1,1.772,0]] - [0,128*0.344+128*0.714, 179.456],
+                            0, 255
+                        ).astype(np.uint8)
+                        _buf = io.BytesIO()
+                        Image.fromarray(rgb).save(_buf, format="JPEG",
+                                                   quality=config.CAMERA_JPEG_QUALITY)
+                        jpeg_bytes = _buf.getvalue()
                 else:
-                    img = Image.fromarray(array, mode="RGB")
-                    if rotation == 90:
-                        img = img.rotate(-90, expand=True)
-                    elif rotation == 180:
-                        img = img.rotate(180, expand=True)
-                    elif rotation == 270:
-                        img = img.rotate(90, expand=True)
-                    _buf = io.BytesIO()
-                    img.save(_buf, format="JPEG", quality=config.CAMERA_JPEG_QUALITY)
-                    jpeg_bytes = _buf.getvalue()
+                    # main stream RGB888
+                    if array.ndim == 3 and array.shape[2] == 4:
+                        array = array[:, :, :3][:, :, ::-1].copy()
+                    elif getattr(config, "CAMERA_SWAP_RB", False):
+                        array = array[:, :, ::-1].copy()
+
+                    if _use_cv2:
+                        bgr = array[:, :, ::-1]
+                        if rotation == 90:
+                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
+                        elif rotation == 180:
+                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
+                        elif rotation == 270:
+                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
+                        _, buf = _cv2.imencode(
+                            ".jpg", bgr,
+                            [_cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
+                        )
+                        jpeg_bytes = buf.tobytes()
+                    else:
+                        from PIL import Image  # type: ignore
+                        img = Image.fromarray(array, mode="RGB")
+                        _buf = io.BytesIO()
+                        img.save(_buf, format="JPEG", quality=config.CAMERA_JPEG_QUALITY)
+                        jpeg_bytes = _buf.getvalue()
 
                 with self._cond:
                     self._frame = jpeg_bytes
@@ -274,6 +338,7 @@ class CameraReader:
                     self._cond.notify_all()
 
         finally:
+            self._cam = None
             cam.stop()
             cam.close()
 

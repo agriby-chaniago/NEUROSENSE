@@ -107,10 +107,10 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
 
     @app.route("/camera/snapshot")
     def camera_snapshot():
-        """Return the latest JPEG frame as a single image (useful for diagnostics)."""
+        """Return a high-res JPEG from the main stream (1920x1080)."""
         if _camera_reader is None:
             return Response("Camera not enabled", status=503)
-        frame = _camera_reader.get_frame()
+        frame = _camera_reader.capture_snapshot()
         if frame is None:
             return Response("No frame yet", status=503)
         return Response(frame, mimetype="image/jpeg",
