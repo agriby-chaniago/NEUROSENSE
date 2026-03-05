@@ -33,12 +33,31 @@
         padding: 1.5rem;
         font-size: 0.92rem;
       }
+      header {
+        display: flex;
+        align-items: center;
+        gap: 1rem;
+        margin-bottom: 1.5rem;
+        padding-bottom: 0.85rem;
+        border-bottom: 2px solid var(--accent);
+      }
+      header > div {
+        flex: 1;
+      }
+      header h1 {
+        font-size: 1.25rem;
+        font-weight: 700;
+        color: var(--accent);
+        letter-spacing: -0.02em;
+      }
+      header p {
+        font-size: 0.75rem;
+        color: var(--muted);
+        margin-top: 0.1rem;
+      }
       nav {
         display: flex;
         gap: 1.5rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.75rem;
-        border-bottom: 2px solid var(--accent);
         align-items: center;
       }
       nav a {
@@ -56,13 +75,6 @@
         color: var(--accent);
         border-bottom-color: var(--accent);
         font-weight: 600;
-      }
-      nav h1 {
-        font-size: 1.15rem;
-        font-weight: 700;
-        color: var(--accent);
-        margin-right: auto;
-        letter-spacing: -0.02em;
       }
       .card {
         background: var(--card-bg);
@@ -234,13 +246,18 @@
     </style>
   </head>
   <body>
-    <nav>
-      <h1>NEUROSENSE</h1>
-      <a href="/">Dashboard</a>
-      <a href="/experiment" class="active">Experiment</a>
-      <a href="/experiment/respondents">Respondents</a>
-      <a href="/experiment/sessions">Sessions</a>
-    </nav>
+    <header>
+      <div>
+        <h1>NEUROSENSE</h1>
+        <p>Experiment Control</p>
+      </div>
+      <nav>
+        <a href="/">Dashboard</a>
+        <a href="/experiment" class="active">Experiment</a>
+        <a href="/experiment/respondents">Respondents</a>
+        <a href="/experiment/sessions">Sessions</a>
+      </nav>
+    </header>
 
     <!-- Recording banner (visible when a session is active) -->
     <div id="rec-banner" {% if active_session %}class="show" {% endif %}>

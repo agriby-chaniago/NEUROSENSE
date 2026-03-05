@@ -264,24 +264,27 @@
       }
 
       /* ── Nav links in header ──────────────────────────── */
-      .nav-btn-primary {
-        color: var(--accent);
-        font-size: 0.82rem;
-        text-decoration: none;
-        background: #e8f0fb;
-        border: 1px solid var(--accent);
-        border-radius: 6px;
-        padding: 0.3rem 0.8rem;
-        font-weight: 600;
+      header nav {
+        margin-left: auto;
+        display: flex;
+        gap: 1.5rem;
+        align-items: center;
       }
-      .nav-btn-secondary {
+      header nav a {
         color: var(--muted);
-        font-size: 0.82rem;
         text-decoration: none;
-        padding: 0.3rem 0.8rem;
+        font-size: 0.85rem;
+        font-weight: 500;
+        padding: 0.2rem 0;
+        border-bottom: 2px solid transparent;
       }
-      .nav-btn-secondary:hover {
+      header nav a:hover {
         color: var(--accent);
+      }
+      header nav a.active {
+        color: var(--accent);
+        border-bottom-color: var(--accent);
+        font-weight: 600;
       }
     </style>
   </head>
@@ -292,9 +295,11 @@
         <h1>NEUROSENSE</h1>
         <p id="last-update">Waiting for data…</p>
       </div>
-      <nav style="margin-left: auto; display: flex; gap: 1rem">
-        <a href="/experiment" class="nav-btn-primary">🧪 Experiment</a>
-        <a href="/experiment/sessions" class="nav-btn-secondary">📋 Sessions</a>
+      <nav>
+        <a href="/" class="active">Dashboard</a>
+        <a href="/experiment">Experiment</a>
+        <a href="/experiment/respondents">Respondents</a>
+        <a href="/experiment/sessions">Sessions</a>
       </nav>
     </header>
 
