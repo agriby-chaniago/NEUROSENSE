@@ -250,6 +250,25 @@ class CameraReader:
                     "CameraReader: could not enable AF: %s", af_exc,
                 )
 
+        # ── Dataset / fixed-exposure mode ─────────────────────────────────
+        # When CAMERA_FIXED_EXPOSURE_US > 0 the AE algorithm is disabled so
+        # luminance never flickers between frames, which would corrupt the
+        # temporal gradient features used by micro-expression models.
+        _fixed_exp = getattr(config, "CAMERA_FIXED_EXPOSURE_US", 0)
+        _fixed_gain = getattr(config, "CAMERA_ANALOGUE_GAIN", 0.0)
+        if _fixed_exp > 0:
+            try:
+                _exp_controls = {"AeEnable": False, "ExposureTime": int(_fixed_exp)}
+                if _fixed_gain > 0:
+                    _exp_controls["AnalogueGain"] = float(_fixed_gain)
+                cam.set_controls(_exp_controls)
+                logger.info(
+                    "CameraReader: fixed exposure mode — ExposureTime=%d µs, AnalogueGain=%s",
+                    int(_fixed_exp), _fixed_gain if _fixed_gain > 0 else "auto",
+                )
+            except Exception as exp_exc:
+                logger.warning("CameraReader: could not set fixed exposure: %s", exp_exc)
+
         self._backend = "picamera2"
         self._error = None
         logger.info(

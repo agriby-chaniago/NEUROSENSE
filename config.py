@@ -182,6 +182,13 @@ CAMERA_AUTOFOCUS     = True
 # → CAMERA_SWAP_RB = True wajib untuk kamera ini.
 CAMERA_SWAP_RB       = True
 
+# Dataset / fixed-exposure mode
+# Set CAMERA_FIXED_EXPOSURE_US > 0 to disable auto-exposure (prevents luminance
+# flicker between frames, critical for micro-expression temporal features).
+# Example: 8333 ≈ 1/120 s shutter at 60 fps.  0 = leave AE enabled (default).
+CAMERA_FIXED_EXPOSURE_US = 0       # microseconds; 0 = AE enabled
+CAMERA_ANALOGUE_GAIN     = 2.0     # analogue gain when fixed-exposure is active
+
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
 # sensor_manager reads this dict — adding a new sensor only needs a new key here
