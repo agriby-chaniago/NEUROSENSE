@@ -139,18 +139,27 @@ class CameraReader:
 
         cam = Picamera2()
 
-        # Build config: size + optional rotation via Transform
+        # Build config: size + rotation
+        frame_us = int(1_000_000 / max(1, config.CAMERA_FRAMERATE))
         video_cfg = cam.create_video_configuration(
             main={
+                # BGR888: explicit flip below guarantees correct RGB output
+                # (prevents blue-skin caused by BGR/RGB byte-order mismatch)
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
-                "format": "RGB888",
+                "format": "BGR888",
             },
             controls={
-                "FrameDurationLimits": (
-                    int(1_000_000 / config.CAMERA_FRAMERATE),
-                    int(1_000_000 / config.CAMERA_FRAMERATE),
-                )
+                "FrameDurationLimits": (frame_us, frame_us),
+                # Auto-white-balance — prevents blue/orange colour casts
+                "AwbEnable": True,
+                "AwbMode":   0,       # 0 = Auto
+                # Sharpness: 1.0 = camera default, 2.0 = noticeably sharper
+                "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
+                # AeEnable: automatic exposure for Arducam
+                "AeEnable":  True,
             },
+            # buffer_count=4 keeps latency low on 64MP
+            buffer_count=4,
         )
 
         # Apply rotation if configured
@@ -171,6 +180,26 @@ class CameraReader:
         cam.configure(video_cfg)
         cam.start()
 
+        # ── Autofocus (Arducam 64MP AF and other AF modules) ─────────────
+        # Must be called AFTER cam.start(). Using integer constants avoids
+        # libcamera enum import failures on some Arducam driver versions.
+        #   AfMode:   0=Manual, 1=Auto(one-shot), 2=Continuous
+        #   AfSpeed:  0=Normal, 1=Fast
+        #   AfTrigger: 0=Start, 1=Cancel
+        if getattr(config, "CAMERA_AUTOFOCUS", False):
+            try:
+                # First do a one-shot scan so the lens settles on a subject,
+                # then switch to continuous tracking.
+                cam.set_controls({"AfMode": 1, "AfTrigger": 0})
+                time.sleep(0.8)   # let one-shot AF converge (~0.5-1 s typical)
+                cam.set_controls({"AfMode": 2, "AfSpeed": 1})
+                logger.info("CameraReader: autofocus enabled (Arducam 64MP AF)")
+            except Exception as af_exc:
+                logger.warning(
+                    "CameraReader: could not enable AF (module may not support it): %s",
+                    af_exc,
+                )
+
         self._backend = "picamera2"
         self._error = None
         logger.info(
@@ -182,9 +211,16 @@ class CameraReader:
             from PIL import Image  # type: ignore
 
             while self._running:
-                # capture_array returns an np.ndarray (RGB888)
+                # capture_array returns an np.ndarray (BGR888 — see format above)
                 array = cam.capture_array("main")
-                img = Image.fromarray(array)
+
+                # ── BGR → RGB channel swap ────────────────────────────────
+                # Many Arducam / libcamera modules return BGR byte order even
+                # when an RGB format is requested.  Using BGR888 + explicit
+                # flip guarantees correct colour (prevents blue-skin artefact).
+                array = array[:, :, ::-1].copy()   # BGR → RGB
+
+                img = Image.fromarray(array, mode="RGB")
 
                 # Software rotation fallback (if libcamera Transform unavailable)
                 rotation = getattr(config, "CAMERA_ROTATION", 0)
@@ -221,6 +257,12 @@ class CameraReader:
         cap.set(cv2.CAP_PROP_FRAME_WIDTH,  config.CAMERA_WIDTH)
         cap.set(cv2.CAP_PROP_FRAME_HEIGHT, config.CAMERA_HEIGHT)
         cap.set(cv2.CAP_PROP_FPS,          config.CAMERA_FRAMERATE)
+        # Request camera-side auto-white-balance and auto-exposure
+        cap.set(cv2.CAP_PROP_AUTO_WB,          1)
+        cap.set(cv2.CAP_PROP_AUTO_EXPOSURE,    3)   # 3 = aperture priority (auto)
+        # Sharpness: 0=off, higher = sharper (range is driver-dependent)
+        sharpness = getattr(config, "CAMERA_SHARPNESS", 1.5)
+        cap.set(cv2.CAP_PROP_SHARPNESS, sharpness)
 
         self._backend = "opencv"
         self._error = None

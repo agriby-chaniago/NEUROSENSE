@@ -153,13 +153,20 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 #
 # To verify CSI: libcamera-hello --list-cameras
 # To verify USB: ls /dev/video*
-CAMERA_ENABLED       = False
-CAMERA_WIDTH         = 640    # capture width in pixels
-CAMERA_HEIGHT        = 480    # capture height in pixels
-CAMERA_FRAMERATE     = 15     # fps — lower = less CPU and bandwidth
-CAMERA_JPEG_QUALITY  = 75     # JPEG quality 1–95 (75 = good balance size/quality)
+CAMERA_ENABLED       = True
+CAMERA_WIDTH         = 1920   # Arducam 64MP: gunakan 1920x1080 untuk streaming
+CAMERA_HEIGHT        = 1080   #   (full 9152×6944 terlalu berat untuk Flask MJPEG)
+CAMERA_FRAMERATE     = 10     # fps — 64MP perlu downscale besar, 10fps lebih stabil
+CAMERA_JPEG_QUALITY  = 85     # JPEG quality 1–95
 CAMERA_ROTATION      = 0      # clockwise degrees: 0 / 90 / 180 / 270
 CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
+
+# Sharpness: 1.0 = camera default, 2.0 = sharper (software sharpening via ISP)
+CAMERA_SHARPNESS     = 2.0
+
+# Autofocus: True untuk Arducam 64MP AF (OV64A40) — modul ini punya AF motorised.
+# False untuk fixed-focus (adjust lensa ring secara manual).
+CAMERA_AUTOFOCUS     = True
 
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
