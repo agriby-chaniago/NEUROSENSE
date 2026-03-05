@@ -96,6 +96,13 @@ def main():
     # ── Graceful shutdown on Ctrl+C / SIGTERM ────────────────────────────
     def shutdown(signum, frame):
         logger.info("Shutdown signal received (%s).", signal.Signals(signum).name)
+        # Stop active session first so data is finalized cleanly before threads die
+        try:
+            if session_manager.get_active_session() is not None:
+                logger.info("Active session detected — stopping before shutdown...")
+                session_manager.stop_session()
+        except Exception as exc:
+            logger.warning("Could not stop active session during shutdown: %s", exc)
         sensor_manager.stop()
         csv_logger.stop()
         if camera_reader is not None:

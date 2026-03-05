@@ -6,15 +6,22 @@ A session = one respondent × one condition × a fixed recording duration.
 Directory layout per session
 -----------------------------
     data/sessions/{session_id}/
-        metadata.json       – session info (respondent, condition, timestamps)
-        sensor_raw.csv      – aligned sensor readings (~10 Hz)
-        frames/             – individual JPEG frames (000000.jpg, 000001.jpg …)
-        video.mp4           – assembled from frames after session stops
+        metadata.json          – session info (respondent, timestamps, counts)
+        sensor_raw.csv         – sensor readings ~10 Hz, timestamp_ms = Unix epoch ms
+        frame_timestamps.csv   – frame_idx, timestamp_ms (Unix epoch ms) per frame
+        frames/                – JPEG frames  000000.jpg, 000001.jpg …
+        video.mp4              – assembled from frames after session stops
+
+Synchronisation
+---------------
+  Both sensor_raw.csv and frame_timestamps.csv use the same time axis:
+  timestamp_ms = int(time.time() * 1000)  (Unix epoch milliseconds, UTC)
+  Post-hoc alignment: pandas.merge_asof(sensor_df, frame_df, on="timestamp_ms")
 
 Recording threads
 -----------------
   sensor loop   : polls SensorManager.get_latest() every 100 ms → sensor_raw.csv
-  video loop    : calls CameraReader.get_new_frame() → frames/ → assemble MP4
+  video loop    : calls CameraReader.get_new_frame() → frames/ + frame_timestamps.csv
   timer loop    : sets stop_event after duration_sec → triggers finalize
 """
 
@@ -69,6 +76,9 @@ class SessionManager:
         )
         self._sessions_dir = Path(sessions_dir)
         self._sessions_dir.mkdir(parents=True, exist_ok=True)
+
+        # Heal any sessions that were left in "recording" state (e.g. Pi crash)
+        self._heal_interrupted_sessions()
 
     # ─── Session lifecycle ────────────────────────────────────────────────
 
@@ -227,13 +237,16 @@ class SessionManager:
         stop_event: threading.Event,
         metadata: dict,
     ):
-        """Record sensor readings to sensor_raw.csv at ~10 Hz."""
+        """Record sensor readings to sensor_raw.csv at ~10 Hz.
+
+        timestamp_ms is Unix epoch milliseconds (int(time.time()*1000)) so it
+        shares the same time axis as frame_timestamps.csv for alignment.
+        """
         if self._sensor_manager is None:
             logger.warning("SessionManager: no sensor_manager — sensor recording skipped")
             return
 
         csv_path  = session_dir / "sensor_raw.csv"
-        start_wall = time.time()
         row_count = 0
 
         with open(csv_path, "w", newline="", encoding="utf-8") as fh:
@@ -246,12 +259,12 @@ class SessionManager:
                 t0   = time.monotonic()
                 data = self._sensor_manager.get_latest()
                 row  = {
-                    "timestamp_ms":       int((time.time() - start_wall) * 1000),
-                    "heart_rate_bpm":     data.get("heart_rate_bpm"),
-                    "spo2_percent":       data.get("spo2_percent"),
+                    "timestamp_ms":        int(time.time() * 1000),  # Unix epoch ms
+                    "heart_rate_bpm":      data.get("heart_rate_bpm"),
+                    "spo2_percent":        data.get("spo2_percent"),
                     "temperature_celsius": data.get("temperature_celsius"),
-                    "gsr_raw_adc":        data.get("gsr_raw_adc"),
-                    "gsr_conductance_us": data.get("gsr_conductance_us"),
+                    "gsr_raw_adc":         data.get("gsr_raw_adc"),
+                    "gsr_conductance_us":  data.get("gsr_conductance_us"),
                 }
                 writer.writerow(row)
                 fh.flush()
@@ -273,19 +286,32 @@ class SessionManager:
         stop_event: threading.Event,
         metadata: dict,
     ):
-        """Save JPEG frames, then assemble MP4 after stop."""
+        """Save JPEG frames + frame_timestamps.csv, then assemble MP4 after stop.
+
+        frame_timestamps.csv columns: frame_idx, timestamp_ms
+        timestamp_ms = Unix epoch milliseconds — same axis as sensor_raw.csv.
+        Written and flushed incrementally so no timestamps are lost on crash.
+        """
         if self._camera_reader is None:
             logger.warning("SessionManager: no camera_reader — video recording skipped")
             return
 
         frame_count = 0
+        ts_path = session_dir / "frame_timestamps.csv"
 
-        while not stop_event.is_set():
-            frame = self._camera_reader.get_new_frame(timeout=0.5)
-            if frame is None:
-                continue
-            (frames_dir / f"{frame_count:06d}.jpg").write_bytes(frame)
-            frame_count += 1
+        with open(ts_path, "w", newline="", encoding="utf-8") as ts_fh:
+            ts_writer = csv.writer(ts_fh)
+            ts_writer.writerow(["frame_idx", "timestamp_ms"])
+
+            while not stop_event.is_set():
+                frame = self._camera_reader.get_new_frame(timeout=0.5)
+                if frame is None:
+                    continue
+                ts_ms = int(time.time() * 1000)  # Unix epoch ms — capture before disk write
+                (frames_dir / f"{frame_count:06d}.jpg").write_bytes(frame)
+                ts_writer.writerow([frame_count, ts_ms])
+                ts_fh.flush()
+                frame_count += 1
 
         with self._lock:
             if self._active:
@@ -300,6 +326,15 @@ class SessionManager:
         if not stop_event.is_set():
             logger.info("SessionManager: timer expired (%ds) — auto-stopping", duration_sec)
             stop_event.set()
+
+        # Wait for sensor and video loops to finish writing their final row/frame
+        # counts to metadata before we finalize and save metadata.json.
+        # We must NOT join ourselves (current thread = t_timer).
+        current = threading.current_thread()
+        for t in list(self._threads):
+            if t is not current:
+                t.join(timeout=60.0)  # 60 s generous budget for MP4 assembly
+
         # Finalize here only for the auto-stop path.
         # If stop_session() was called first it already joined this thread after
         # setting the stop_event, so _finalize_session() will be a safe no-op
@@ -370,6 +405,38 @@ class SessionManager:
         nums  = [int(n[1:4]) for n in existing if len(n) >= 4]
         next_n = max(nums, default=0) + 1
         return f"S{next_n:03d}"
+
+    def _heal_interrupted_sessions(self):
+        """
+        Called once at startup.  Any session whose metadata.json still has
+        status='recording' was interrupted (Pi crash / power loss).  Mark it
+        as 'interrupted' so it never blocks a new session from starting and
+        the UI clearly shows the data may be incomplete.
+        """
+        healed = 0
+        for d in self._sessions_dir.iterdir():
+            if not d.is_dir():
+                continue
+            meta_file = d / "metadata.json"
+            if not meta_file.exists():
+                continue
+            try:
+                with open(meta_file, encoding="utf-8") as f:
+                    meta = json.load(f)
+                if meta.get("status") == "recording":
+                    meta["status"] = "interrupted"
+                    meta["stopped_at_utc"] = datetime.now(timezone.utc).isoformat()
+                    meta["interrupted_reason"] = "Process restart — session was not stopped cleanly"
+                    self._save_json(meta_file, meta)
+                    healed += 1
+                    logger.warning(
+                        "Session %s marked as interrupted (was still 'recording' at startup)",
+                        meta.get("session_id", d.name),
+                    )
+            except Exception as exc:
+                logger.warning("Could not heal session %s: %s", d.name, exc)
+        if healed:
+            logger.info("Healed %d interrupted session(s) at startup", healed)
 
     @staticmethod
     def _save_json(path: Path, data: dict):

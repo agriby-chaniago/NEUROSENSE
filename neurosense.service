@@ -8,7 +8,12 @@ Type=simple
 User=pi
 WorkingDirectory=/home/pi/neurosense
 # Activate the virtual environment before running
-ExecStart=/home/pi/neurosense_env/bin/python /home/pi/neurosense/main.py
+# NOTE: update the path below to match your actual venv.
+#   If using .venv (created via python -m venv .venv):
+#     ExecStart=/home/pi/neurosense/.venv/bin/python /home/pi/neurosense/main.py
+#   If using a named env (neurosense_env outside the project dir):
+#     ExecStart=/home/pi/neurosense_env/bin/python /home/pi/neurosense/main.py
+ExecStart=/home/pi/neurosense/.venv/bin/python /home/pi/neurosense/main.py
 Restart=on-failure
 RestartSec=5s
 StandardOutput=journal

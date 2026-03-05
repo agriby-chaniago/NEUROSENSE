@@ -219,6 +219,32 @@ function connect() {
     updateCards(d);
     updateAlert(d);
 
+    // Sensor stale: grey out all metric cards when sensors stop updating
+    document.querySelectorAll(".metric-card").forEach((card) => {
+      card.classList.toggle("stale", !!d.sensor_stale);
+    });
+
+    // Disk space warning (threshold: < 2 GB)
+    const diskWarn = document.getElementById("disk-warning");
+    const diskText = document.getElementById("disk-warning-text");
+    if (diskWarn && d.disk_free_gb !== null && d.disk_free_gb !== undefined) {
+      if (d.disk_free_gb < 2) {
+        diskText.textContent = `Disk space low — ${d.disk_free_gb} GB remaining. Recording may fail soon.`;
+        diskWarn.classList.add("visible");
+      } else {
+        diskWarn.classList.remove("visible");
+      }
+    }
+
+    // Update camera FPS badge
+    const fpsBadge = document.getElementById("camera-fps");
+    if (fpsBadge) {
+      fpsBadge.textContent =
+        d.camera_fps !== null && d.camera_fps !== undefined
+          ? d.camera_fps.toFixed(1) + " fps"
+          : "— fps";
+    }
+
     // Update timestamps
     const now = new Date().toLocaleTimeString();
     lastUpdate.textContent = `Last update: ${now}`;

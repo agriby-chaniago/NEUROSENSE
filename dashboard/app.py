@@ -24,6 +24,7 @@ POST /experiment/session/stop       → stop recording session
 
 import json
 import logging
+import shutil
 import time
 from typing import Optional
 from flask import (
@@ -82,6 +83,16 @@ def create_app(
         def event_generator():
             while True:
                 data = _sensor_manager.get_latest()
+                # Attach live camera FPS so the dashboard can display it
+                if _camera_reader is not None:
+                    _fps = _camera_reader.fps
+                    data["camera_fps"] = round(_fps, 1) if _fps is not None else None
+                # Disk free space on the data partition
+                try:
+                    _du = shutil.disk_usage(config.DATA_DIR)
+                    data["disk_free_gb"] = round(_du.free / 1_073_741_824, 2)
+                except Exception:
+                    data["disk_free_gb"] = None
                 # Convert None to JSON null cleanly
                 payload = json.dumps(data, default=lambda x: None)
                 yield f"data: {payload}\n\n"
@@ -279,7 +290,11 @@ def create_app(
         data         = request.get_json(silent=True) or request.form
         respondent   = data.get("respondent_id", "")
         duration_raw = data.get("duration_sec", None)
-        duration     = int(duration_raw) if duration_raw else None
+        try:
+            duration = int(duration_raw) if duration_raw else None
+        except (ValueError, TypeError):
+            return jsonify({"status": "error",
+                            "message": "duration_sec must be an integer"}), 400
         if not respondent:
             return jsonify({"status": "error",
                             "message": "respondent_id required"}), 400

@@ -93,7 +93,39 @@
       #alert-banner.visible {
         display: flex;
       }
+      /* ── Disk warning banner ──────────────────────────── */
+      #disk-warning {
+        display: none;
+        background: #fef3e2;
+        border: 1px solid #f5c97a;
+        border-left: 4px solid var(--yellow);
+        border-radius: 6px;
+        padding: 0.75rem 1rem;
+        margin-bottom: 1.25rem;
+        color: #7a4800;
+        font-size: 0.88rem;
+        font-weight: 600;
+        align-items: center;
+        gap: 0.6rem;
+      }
+      #disk-warning.visible {
+        display: flex;
+      }
 
+      /* ── Sensor stale overlay on metric cards ───────────────── */
+      .metric-card.stale .value {
+        color: var(--muted) !important;
+        opacity: 0.5;
+      }
+      .metric-card.stale::after {
+        content: 'NO SIGNAL';
+        display: block;
+        font-size: 0.6rem;
+        font-weight: 700;
+        letter-spacing: 0.08em;
+        color: var(--muted);
+        margin-top: 0.2rem;
+      }
       /* ── Big metric cards ─────────────────────────────── */
       .metrics-grid {
         display: grid;
@@ -249,13 +281,31 @@
         align-items: center;
         gap: 0.6rem;
       }
-      #camera-feed {
+      .camera-wrap {
+        position: relative;
         width: 100%;
         max-width: 640px;
+      }
+      #camera-feed {
+        width: 100%;
         border-radius: 6px;
         border: 1px solid var(--border);
         background: #e8ecf0;
         display: block;
+      }
+      #camera-fps {
+        position: absolute;
+        bottom: 8px;
+        right: 8px;
+        background: rgba(0, 0, 0, 0.52);
+        color: #fff;
+        font-size: 0.7rem;
+        font-weight: 700;
+        padding: 2px 8px;
+        border-radius: 4px;
+        letter-spacing: 0.05em;
+        pointer-events: none;
+        font-family: monospace;
       }
       #camera-status {
         font-size: 0.72rem;
@@ -307,7 +357,11 @@
       <span style="font-size: 1.1rem">&#9888;</span>
       <span id="alert-text"></span>
     </div>
-
+    <!-- ── Disk warning banner ───────────────────────────────── -->
+    <div id="disk-warning">
+      <span style="font-size: 1.1rem">&#128190;</span>
+      <span id="disk-warning-text"></span>
+    </div>
     <!-- ── Big metric cards ─────────────────────────────── -->
     <div class="metrics-grid">
       <div class="metric-card hr">
@@ -349,13 +403,16 @@
     <div class="camera-card" id="camera-section">
       <h3>&#127909; Arducam Live Feed</h3>
       <div class="camera-inner">
-        <img
-          id="camera-feed"
-          src="/camera/stream"
-          alt="Camera stream"
-          onerror="onCameraError()"
-          onload="onCameraLoad()"
-        />
+        <div class="camera-wrap">
+          <img
+            id="camera-feed"
+            src="/camera/stream"
+            alt="Camera stream"
+            onerror="onCameraError()"
+            onload="onCameraLoad()"
+          />
+          <span id="camera-fps">— fps</span>
+        </div>
         <div id="camera-status">Connecting…</div>
       </div>
     </div>

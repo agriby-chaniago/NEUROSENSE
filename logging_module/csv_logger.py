@@ -63,7 +63,12 @@ class CSVLogger:
         """
         Enqueue a row for writing. Non-blocking — drops row if queue is full
         (prevents sensor threads from blocking on a slow disk).
+        Automatically restarts the writer thread if it has crashed.
         """
+        # Auto-restart if the writer thread died (e.g. disk-full I/O error)
+        if self._thread is not None and not self._thread.is_alive():
+            logger.warning("CSVLogger writer thread died — restarting...")
+            self.start()
         try:
             self._queue.put_nowait(row)
         except queue.Full:
@@ -83,21 +88,25 @@ class CSVLogger:
 
                 if row is _STOP_SENTINEL:
                     logger.debug("CSVLogger writer received stop sentinel.")
+                    self._queue.task_done()
                     break
 
-                # Daily rotation — open a new file if date changed
-                today_file = self._get_filepath()
-                if today_file != current_file:
-                    if file_handle:
-                        file_handle.flush()
-                        file_handle.close()
-                    file_handle, writer = self._open_file(today_file)
-                    current_file = today_file
+                try:
+                    # Daily rotation — open a new file if date changed
+                    today_file = self._get_filepath()
+                    if today_file != current_file:
+                        if file_handle:
+                            file_handle.flush()
+                            file_handle.close()
+                        file_handle, writer = self._open_file(today_file)
+                        current_file = today_file
 
-                writer.writerow(row)
-                file_handle.flush()   # ensure data is on disk even if Pi loses power
-                self._queue.task_done()
-
+                    writer.writerow(row)
+                    file_handle.flush()   # ensure data is on disk even if Pi loses power
+                except Exception as row_exc:
+                    logger.error("CSVLogger failed to write row: %s", row_exc)
+                finally:
+                    self._queue.task_done()   # always release, even on write error
         except Exception as exc:
             logger.error("CSVLogger writer thread crashed: %s", exc)
         finally:

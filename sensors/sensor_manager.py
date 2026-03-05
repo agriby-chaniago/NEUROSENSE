@@ -39,6 +39,10 @@ class SensorManager:
         self.latest_data["alert_active"]  = False
         self.latest_data["alert_reasons"] = ""
 
+        # Monotonic timestamp of the last successful sensor _update().
+        # Used to detect sensor dropout: >5s without update = stale.
+        self._last_update_mono: float = 0.0
+
         # Build the sensor registry from ACTIVE_SENSORS config
         self._sensors: dict = {}
         self._register_sensors()
@@ -158,6 +162,7 @@ class SensorManager:
             self.latest_data["timestamp_utc"]  = now_utc
             self.latest_data["schema_version"] = config.DATA_SCHEMA_VERSION
             self.latest_data.update(new_data)
+            self._last_update_mono = time.monotonic()
             snapshot = dict(self.latest_data)
 
         # Evaluate alerts outside lock (buzzer runs in its own thread)
@@ -177,9 +182,21 @@ class SensorManager:
         return [entry["reader"].health() for entry in self._sensors.values()]
 
     def get_latest(self) -> dict:
-        """Thread-safe snapshot of the latest aggregated sensor reading."""
+        """Thread-safe snapshot of the latest aggregated sensor reading.
+
+        Includes 'sensor_stale': True when no sensor has updated in >5 s
+        (e.g. all sensor threads frozen / hardware disconnected).
+        """
         with self._lock:
-            return dict(self.latest_data)
+            snapshot = dict(self.latest_data)
+            elapsed = time.monotonic() - self._last_update_mono
+            # _last_update_mono starts at 0.0 — don't flag stale for the first
+            # 10 s while sensors are still calibrating.
+            snapshot["sensor_stale"] = (
+                self._last_update_mono > 0.0 and elapsed > 5.0
+            )
+            snapshot["sensor_last_update_s"] = round(elapsed, 1) if self._last_update_mono > 0.0 else None
+        return snapshot
 
     def recalibrate_sensor(self, name: str) -> dict:
         """

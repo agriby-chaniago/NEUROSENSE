@@ -95,8 +95,10 @@ class RespondentRegistry:
         return entry
 
     def get(self, respondent_id: str) -> Optional[dict]:
-        """Return respondent dict or None."""
-        return self._data.get(respondent_id)
+        """Return a copy of the respondent dict or None."""
+        with self._lock:
+            entry = self._data.get(respondent_id)
+            return dict(entry) if entry is not None else None
 
     def get_all(self) -> list[dict]:
         """Return all respondents sorted by ID."""
@@ -112,7 +114,7 @@ class RespondentRegistry:
                 if k in ("gender", "age", "notes"):
                     self._data[respondent_id][k] = v
             self._save()
-        return self._data[respondent_id]
+            return dict(self._data[respondent_id])  # return copy inside lock
 
     def delete(self, respondent_id: str) -> bool:
         with self._lock:

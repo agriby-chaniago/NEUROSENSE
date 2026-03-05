@@ -54,7 +54,7 @@ class GSRReader(BaseSensor):
 
         Returns
         -------
-        dict with keys: baseline_raw, baseline_10bit, max_conductance_us
+        dict with keys: baseline_10bit, max_conductance_us
         """
         if self._adc is None:
             raise RuntimeError("GSRReader not initialised; call calibrate() first.")

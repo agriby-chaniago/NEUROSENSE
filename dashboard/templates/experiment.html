@@ -236,9 +236,49 @@
           grid-template-columns: 1fr;
         }
       }
+
+      /* ── Countdown overlay ────────────────────────────── */
+      #countdown-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: rgba(10, 22, 40, 0.82);
+        z-index: 1000;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 0.75rem;
+      }
+      #countdown-overlay.show {
+        display: flex;
+      }
+      #countdown-number {
+        font-size: 8rem;
+        font-weight: 800;
+        color: #fff;
+        line-height: 1;
+        transition: transform 0.15s ease, opacity 0.15s ease;
+      }
+      #countdown-number.pop {
+        transform: scale(1.25);
+        opacity: 0.7;
+      }
+      #countdown-label {
+        font-size: 1rem;
+        font-weight: 600;
+        color: rgba(255,255,255,0.65);
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
     </style>
   </head>
   <body>
+    <!-- Countdown overlay -->
+    <div id="countdown-overlay">
+      <div id="countdown-number">3</div>
+      <div id="countdown-label">Get ready…</div>
+    </div>
+
     <header>
       <h1>NEUROSENSE</h1>
       <nav>
@@ -395,7 +435,49 @@
     </div>
 
     <script>
-      // Poll active session and update banner every second
+      // ── Countdown before start ────────────────────────────────────────────
+      const startForm = document.querySelector("form[action='/experiment/session/start']");
+      if (startForm) {
+        startForm.addEventListener("submit", function (e) {
+          e.preventDefault();
+          const overlay  = document.getElementById("countdown-overlay");
+          const numEl    = document.getElementById("countdown-number");
+          const labelEl  = document.getElementById("countdown-label");
+          overlay.classList.add("show");
+
+          const steps = [
+            { n: "3", label: "Get ready…" },
+            { n: "2", label: "Stay still…" },
+            { n: "1", label: "Almost…" },
+            { n: "REC", label: "Recording started!" },
+          ];
+
+          function pop(el) {
+            el.classList.remove("pop");
+            void el.offsetWidth;  // reflow to restart transition
+            el.classList.add("pop");
+          }
+
+          let i = 0;
+          function tick() {
+            if (i < steps.length) {
+              numEl.textContent   = steps[i].n;
+              labelEl.textContent = steps[i].label;
+              pop(numEl);
+              i++;
+              if (i < steps.length) {
+                setTimeout(tick, 1000);
+              } else {
+                // Last step shown (REC!) — submit after short delay
+                setTimeout(() => startForm.submit(), 500);
+              }
+            }
+          }
+          tick();
+        });
+      }
+
+      // ── Poll active session and update banner every second ────────────
       function pollActive() {
         fetch("/experiment/session/active")
           .then((r) => r.json())

@@ -23,6 +23,7 @@ import logging
 import queue
 import threading
 import time
+from collections import deque
 from typing import Optional
 
 import config
@@ -51,6 +52,9 @@ class CameraReader:
         self._backend: Optional[str] = None   # "picamera2" | "opencv"
         self._error: Optional[str] = None     # last fatal error message
         self._cam = None   # picamera2 Picamera2 instance (set after start)
+        # Rolling FPS: stores monotonic timestamps of last 60 encoded frames.
+        # fps = (n-1) / (ts[-1] - ts[0])  — accurate even with variable cadence.
+        self._fps_timestamps: deque = deque(maxlen=60)
 
     # ── Lifecycle ─────────────────────────────────────────────────────────
 
@@ -120,6 +124,21 @@ class CameraReader:
             return self.get_frame()
 
     @property
+    def fps(self) -> Optional[float]:
+        """Rolling FPS computed over the last 60 encoded frames.
+
+        Returns None until at least 2 frames have been captured.
+        """
+        with self._cond:
+            ts = list(self._fps_timestamps)
+        if len(ts) < 2:
+            return None
+        elapsed = ts[-1] - ts[0]
+        if elapsed <= 0:
+            return None
+        return (len(ts) - 1) / elapsed
+
+    @property
     def backend(self) -> Optional[str]:
         """Which backend is active: 'picamera2', 'opencv', or None if failed."""
         return self._backend
@@ -131,10 +150,12 @@ class CameraReader:
             return self._frame is not None
 
     def health(self) -> dict:
+        fps = self.fps
         return {
             "sensor":  "camera",
             "ok":      self._backend is not None and self._error is None,
             "backend": self._backend,
+            "fps":     round(fps, 1) if fps is not None else None,
             "error":   self._error,
         }
 
@@ -343,6 +364,7 @@ class CameraReader:
                         with self._cond:
                             self._frame = jpeg_bytes
                             self._frame_seq += 1
+                            self._fps_timestamps.append(time.monotonic())
                             self._cond.notify_all()
                     except Exception as enc_exc:
                         logger.debug("CameraReader: encode error: %s", enc_exc)
@@ -447,6 +469,7 @@ class CameraReader:
                     with self._cond:
                         self._frame = buf.tobytes()
                         self._frame_seq += 1
+                        self._fps_timestamps.append(time.monotonic())
                         self._cond.notify_all()
         finally:
             cap.release()
