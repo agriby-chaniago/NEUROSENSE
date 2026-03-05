@@ -313,7 +313,7 @@ class CameraReader:
                     if raw is None:   # poison pill — stop signal
                         break
                     try:
-                    jpeg_bytes = _encode_frame(raw)
+                        jpeg_bytes = _encode_frame(raw)
                         with self._cond:
                             self._frame = jpeg_bytes
                             self._frame_seq += 1
