@@ -154,18 +154,18 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 # To verify CSI: libcamera-hello --list-cameras
 # To verify USB: ls /dev/video*
 CAMERA_ENABLED       = True
-CAMERA_WIDTH         = 1920   # resolusi main stream (untuk snapshot)
-CAMERA_HEIGHT        = 1080
-CAMERA_FRAMERATE     = 30     # fps — lores stream ringan, Pi 5 kuat 30fps
-CAMERA_JPEG_QUALITY  = 75     # kualitas JPEG stream (lores sudah cukup)
+CAMERA_WIDTH         = 1280   # OV64A40 maks 60fps di 1280x720 (sensor hardware limit)
+CAMERA_HEIGHT        = 720    # 1920x1080 hanya bisa ~30fps
+CAMERA_FRAMERATE     = 60     # fps
+CAMERA_JPEG_QUALITY  = 75     # turun sedikit agar encode tetap <16ms per frame
 CAMERA_ROTATION      = 0      # clockwise degrees: 0 / 90 / 180 / 270
 CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
 
 # Resolusi stream MJPEG (lores) — ISP hardware melakukan downscale, CPU tidak terbebani.
-# 640x360 = ~9x lebih ringan dari 1920x1080, latency jauh lebih rendah.
-# Naikkan ke 960x540 jika ingin lebih detail tapi masih cepat.
-CAMERA_STREAM_WIDTH  = 640
-CAMERA_STREAM_HEIGHT = 360
+# Untuk 60fps: 480x270 = encode ~3ms, cukup budget di 16.6ms/frame window.
+# Naikkan ke 640x360 jika ingin lebih detail (encode ~5ms, masih aman di 60fps).
+CAMERA_STREAM_WIDTH  = 480
+CAMERA_STREAM_HEIGHT = 270
 CAMERA_ROTATION      = 0      # clockwise degrees: 0 / 90 / 180 / 270
 CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
 

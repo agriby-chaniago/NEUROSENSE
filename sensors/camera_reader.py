@@ -191,11 +191,11 @@ class CameraReader:
 
         frame_us = int(1_000_000 / max(1, config.CAMERA_FRAMERATE))
 
-        # PiSP (Pi 5) only supports YUV formats for lores — MJPEG is unsupported
-        # and causes a hard FATAL crash (not catchable by Python try/except).
-        # BGR888 lores: ISP does colour conversion in hardware — no cvtColor
-        # needed in Python, removes one CPU step and fixes YUV chroma swap.
-        lores_fmt = "BGR888"
+        # PiSP (Pi 5) silently adjusts unsupported formats ("configuration has
+        # been adjusted" in logs). Use RGB888 for both streams — this is what
+        # PiSP actually delivers, and CAMERA_SWAP_RB=True corrects the channel
+        # order (OV64A40 via PiSP sends BGR data in RGB888 containers).
+        lores_fmt = "RGB888"
 
         video_cfg = cam.create_video_configuration(
             main={
@@ -274,9 +274,17 @@ class CameraReader:
             jpeg_q   = config.CAMERA_JPEG_QUALITY
 
             def _encode_frame(raw: "_np.ndarray") -> bytes:
-                """Convert BGR888 lores array to JPEG bytes."""
+                """Convert RGB888 lores array to JPEG bytes."""
+                # OV64A40 + PiSP sends BGR data inside RGB888 container.
+                # CAMERA_SWAP_RB=True corrects this (same logic as capture_snapshot).
+                arr = raw
+                if arr.ndim == 3 and arr.shape[2] == 4:
+                    arr = arr[:, :, :3]  # strip alpha
+                if getattr(config, "CAMERA_SWAP_RB", False):
+                    arr = arr[:, :, ::-1]  # now correct RGB
+                # cv2 expects BGR
                 if _use_cv2:
-                    bgr = raw  # already BGR from ISP — no cvtColor needed
+                    bgr = arr[:, :, ::-1]
                     if rotation == 90:
                         bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
                     elif rotation == 180:
@@ -288,9 +296,8 @@ class CameraReader:
                     )
                     return buf.tobytes()
                 else:
-                    # PIL fallback: BGR array → RGB for PIL
-                    rgb = raw[:, :, ::-1]
-                    img = _Image.fromarray(rgb, mode="RGB")
+                    # PIL fallback: arr is RGB, PIL.fromarray expects RGB
+                    img = _Image.fromarray(arr, mode="RGB")
                     if rotation == 90:
                         img = img.rotate(-90, expand=True)
                     elif rotation == 180:
@@ -326,8 +333,14 @@ class CameraReader:
             )
             _enc_thread.start()
 
+            # FPS counters — logged every 5 seconds
+            _cap_count  = 0
+            _drop_count = 0
+            _fps_t0     = time.monotonic()
+
             while self._running:
-                raw = cam.capture_array("lores")   # YUV420 from ISP
+                raw = cam.capture_array("lores")   # BGR888 from ISP
+                _cap_count += 1
 
                 # Non-blocking put: drop stale frame if encode can't keep up
                 try:
@@ -338,6 +351,19 @@ class CameraReader:
                     except queue.Empty:
                         pass
                     _enc_q.put_nowait(raw)
+                    _drop_count += 1
+
+                # Log actual FPS every 5 seconds
+                _elapsed = time.monotonic() - _fps_t0
+                if _elapsed >= 5.0:
+                    _fps = _cap_count / _elapsed
+                    logger.info(
+                        "CameraReader: capture %.1f fps | dropped %d frames in %.0fs",
+                        _fps, _drop_count, _elapsed,
+                    )
+                    _cap_count  = 0
+                    _drop_count = 0
+                    _fps_t0     = time.monotonic()
 
         finally:
             # Send poison pill and wait briefly for encode thread
