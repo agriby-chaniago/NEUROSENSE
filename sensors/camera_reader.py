@@ -193,9 +193,9 @@ class CameraReader:
 
         # PiSP (Pi 5) only supports YUV formats for lores — MJPEG is unsupported
         # and causes a hard FATAL crash (not catchable by Python try/except).
-        # YUV420 is the fastest native lores format; cv2.cvtColor to BGR is SIMD-
-        # accelerated and typically takes <1 ms for 640×360.
-        lores_fmt = "YUV420"
+        # BGR888 lores: ISP does colour conversion in hardware — no cvtColor
+        # needed in Python, removes one CPU step and fixes YUV chroma swap.
+        lores_fmt = "BGR888"
 
         video_cfg = cam.create_video_configuration(
             main={
@@ -212,7 +212,7 @@ class CameraReader:
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
             },
-            buffer_count=6,
+            buffer_count=8,   # deeper ISP buffer = no stall at 30fps
         )
 
         # Apply rotation if configured
@@ -273,10 +273,10 @@ class CameraReader:
             rotation = getattr(config, "CAMERA_ROTATION", 0)
             jpeg_q   = config.CAMERA_JPEG_QUALITY
 
-            def _yuv420_to_jpeg(raw: "_np.ndarray") -> bytes:
-                """Convert YUV420 numpy array to JPEG bytes."""
+            def _encode_frame(raw: "_np.ndarray") -> bytes:
+                """Convert BGR888 lores array to JPEG bytes."""
                 if _use_cv2:
-                    bgr = _cv2.cvtColor(raw, _cv2.COLOR_YUV420p2BGR)
+                    bgr = raw  # already BGR from ISP — no cvtColor needed
                     if rotation == 90:
                         bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
                     elif rotation == 180:
@@ -288,18 +288,9 @@ class CameraReader:
                     )
                     return buf.tobytes()
                 else:
-                    # PIL + numpy fallback — no cv2 required
-                    h_yuv, w = raw.shape[:2]
-                    h = h_yuv * 2 // 3
-                    y = raw[:h,           :].astype(_np.float32)
-                    u = raw[h:h+h//4,     :].reshape(h//2, w//2).astype(_np.float32) - 128
-                    v = raw[h+h//4:h+h//2, :].reshape(h//2, w//2).astype(_np.float32) - 128
-                    u = _np.repeat(_np.repeat(u, 2, axis=0), 2, axis=1)
-                    v = _np.repeat(_np.repeat(v, 2, axis=0), 2, axis=1)
-                    r = _np.clip(y + 1.402  * v,                    0, 255).astype(_np.uint8)
-                    g = _np.clip(y - 0.3441 * u - 0.7141 * v,      0, 255).astype(_np.uint8)
-                    b = _np.clip(y + 1.772  * u,                    0, 255).astype(_np.uint8)
-                    img = _Image.fromarray(_np.stack([r, g, b], axis=2))
+                    # PIL fallback: BGR array → RGB for PIL
+                    rgb = raw[:, :, ::-1]
+                    img = _Image.fromarray(rgb, mode="RGB")
                     if rotation == 90:
                         img = img.rotate(-90, expand=True)
                     elif rotation == 180:
@@ -322,7 +313,7 @@ class CameraReader:
                     if raw is None:   # poison pill — stop signal
                         break
                     try:
-                        jpeg_bytes = _yuv420_to_jpeg(raw)
+                    jpeg_bytes = _encode_frame(raw)
                         with self._cond:
                             self._frame = jpeg_bytes
                             self._frame_seq += 1
