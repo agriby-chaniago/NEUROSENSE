@@ -60,6 +60,7 @@ class SessionManager:
         self._lock = threading.Lock()
 
         self._active: Optional[dict] = None   # running session state
+        self._last_meta: Optional[dict] = None  # metadata of last completed session
         self._threads: list[threading.Thread] = []
 
         sessions_dir = getattr(
@@ -172,7 +173,14 @@ class SessionManager:
         for t in self._threads:
             t.join(timeout=15.0)
 
-        return self._finalize_session()
+        # After joining all threads, _timer_loop may have already called
+        # _finalize_session() which sets self._active = None.
+        # Try to finalize; if already done, use _last_meta as fallback.
+        result = self._finalize_session()
+        if result is None:
+            with self._lock:
+                result = self._last_meta
+        return result
 
     def get_active_session(self) -> Optional[dict]:
         """
@@ -192,6 +200,8 @@ class SessionManager:
         """Return metadata dicts for all sessions, newest first."""
         result = []
         for d in sorted(self._sessions_dir.iterdir(), reverse=True):
+            if not d.is_dir():          # skip stray files
+                continue
             meta_file = d / "metadata.json"
             if meta_file.exists():
                 try:
@@ -285,11 +295,15 @@ class SessionManager:
         self._assemble_mp4(session_dir, frames_dir, frame_count)
 
     def _timer_loop(self, duration_sec: int, stop_event: threading.Event):
-        """Signal stop after duration_sec, then trigger finalize."""
+        """Signal stop after duration_sec, then finalize the session."""
         stop_event.wait(timeout=duration_sec)
         if not stop_event.is_set():
             logger.info("SessionManager: timer expired (%ds) — auto-stopping", duration_sec)
             stop_event.set()
+        # Finalize here only for the auto-stop path.
+        # If stop_session() was called first it already joined this thread after
+        # setting the stop_event, so _finalize_session() will be a safe no-op
+        # (returns None) and stop_session() uses _last_meta as the fallback.
         self._finalize_session()
 
     # ─── Helpers ──────────────────────────────────────────────────────────
@@ -306,6 +320,7 @@ class SessionManager:
         self._save_json(active["session_dir"] / "metadata.json", meta)
 
         with self._lock:
+            self._last_meta = meta   # persist so stop_session() can return it
             self._active  = None
             self._threads = []
 
@@ -322,8 +337,7 @@ class SessionManager:
         try:
             import cv2
 
-            fps    = getattr(config, "CAMERA_STREAM_WIDTH", None)  # use lores fps
-            fps    = getattr(config, "CAMERA_FRAMERATE", 30)
+            fps      = getattr(config, "CAMERA_FRAMERATE", 30)
             first  = cv2.imread(str(frames_dir / "000000.jpg"))
             if first is None:
                 logger.warning("MP4 assembly: first frame unreadable — skipping")

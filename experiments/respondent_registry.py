@@ -54,10 +54,11 @@ class RespondentRegistry:
 
     def next_id(self) -> str:
         """Return next auto-generated ID, e.g. R005 if R001–R004 exist."""
-        nums = [
-            int(k[1:]) for k in self._data
-            if k.startswith("R") and k[1:].isdigit()
-        ]
+        with self._lock:
+            nums = [
+                int(k[1:]) for k in self._data
+                if k.startswith("R") and k[1:].isdigit()
+            ]
         n = max(nums, default=0) + 1
         return f"R{n:03d}"
 

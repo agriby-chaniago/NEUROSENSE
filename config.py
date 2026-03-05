@@ -166,8 +166,6 @@ CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
 # Naikkan ke 640x360 jika ingin lebih detail (encode ~5ms, masih aman di 60fps).
 CAMERA_STREAM_WIDTH  = 480
 CAMERA_STREAM_HEIGHT = 270
-CAMERA_ROTATION      = 0      # clockwise degrees: 0 / 90 / 180 / 270
-CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
 
 # Sharpness: 1.0 = camera default, 2.0 = sharper (software sharpening via ISP)
 CAMERA_SHARPNESS     = 2.0
