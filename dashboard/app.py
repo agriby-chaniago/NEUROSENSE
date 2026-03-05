@@ -88,8 +88,8 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
 
         def generate():
             while True:
-                # Blocks until capture thread signals a new frame — zero delay.
-                # Falls back to last frame on timeout (keeps connection alive).
+                # Blocks until capture thread signals a new frame (zero delay).
+                # Timeout 0.5 s keeps connection alive if camera stalls briefly.
                 frame = _camera_reader.get_new_frame(timeout=0.5)
                 if frame is not None:
                     yield (
@@ -98,11 +98,18 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
                         + frame
                         + b"\r\n"
                     )
+                    # get_new_frame() already waited for THIS frame to be new —
+                    # immediately loop back so we never sleep between frames.
 
         return Response(
             generate(),
             mimetype="multipart/x-mixed-replace; boundary=frame",
-            headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+            headers={
+                "Cache-Control":     "no-cache",
+                "X-Accel-Buffering": "no",
+                # Tell browser to display frames immediately, don't buffer
+                "Transfer-Encoding": "chunked",
+            },
         )
 
     @app.route("/camera/snapshot")

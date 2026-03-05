@@ -6,19 +6,21 @@ Backend priority
 1. picamera2  – native CSI ribbon cable / Arducam CSI (RPi OS Bullseye+)
 2. OpenCV     – USB Arducam or any V4L2 /dev/videoX device
 
-Thread-safe: a daemon thread captures frames continuously; the latest
-JPEG bytes are kept in memory and served on demand by the Flask MJPEG route.
+Pipeline (picamera2)
+--------------------
+  ISP hardware
+  ├── main  (1920×1080 RGB888)  →  /camera/snapshot  (high-res)
+  └── lores (640×360  MJPEG)    →  MJPEG live stream  (hardware-encoded, ~0 CPU)
 
-Usage
------
-    cam = CameraReader()
-    cam.start()
-    frame = cam.get_frame()   # bytes | None
-    cam.stop()
+If the Pi ISP does not support MJPEG lores, falls back to YUV420 + cv2 encode.
+
+Thread-safe: capture thread writes frames; MJPEG generator blocks on
+threading.Condition until the next frame arrives (zero polling latency).
 """
 
 import io
 import logging
+import queue
 import threading
 import time
 from typing import Optional
@@ -27,7 +29,6 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# How long (s) to wait between retries if the camera stream crashes
 _RESTART_DELAY_S = 3.0
 
 
@@ -189,6 +190,22 @@ class CameraReader:
         sh = getattr(config, "CAMERA_STREAM_HEIGHT", 360)
 
         frame_us = int(1_000_000 / max(1, config.CAMERA_FRAMERATE))
+
+        # Try hardware MJPEG for lores first — Pi 5 PiSP encodes JPEG in ISP,
+        # meaning capture_array("lores") returns a ready JPEG buffer (zero CPU).
+        # Fall back to YUV420 + software cv2 encode on older firmware.
+        lores_fmt = "MJPEG"
+        try:
+            _test_cfg = cam.create_video_configuration(
+                main={"size": (config.CAMERA_WIDTH, config.CAMERA_HEIGHT), "format": "RGB888"},
+                lores={"size": (sw, sh), "format": "MJPEG"},
+            )
+            cam.configure(_test_cfg)
+            logger.info("CameraReader: ISP hardware MJPEG lores supported")
+        except Exception:
+            lores_fmt = "YUV420"
+            logger.info("CameraReader: hardware MJPEG not supported, using YUV420")
+
         video_cfg = cam.create_video_configuration(
             main={
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
@@ -196,7 +213,7 @@ class CameraReader:
             },
             lores={
                 "size":   (sw, sh),
-                "format": "YUV420",   # native ISP output — no colour conversion needed
+                "format": lores_fmt,
             },
             controls={
                 "FrameDurationLimits": (frame_us, frame_us * 3),
@@ -204,7 +221,7 @@ class CameraReader:
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
             },
-            buffer_count=4,
+            buffer_count=6,   # deeper buffer = ISP never stalls waiting for consumer
         )
 
         # Apply rotation if configured
@@ -259,85 +276,75 @@ class CameraReader:
                 _use_cv2 = False
 
             rotation = getattr(config, "CAMERA_ROTATION", 0)
+            hw_mjpeg = (lores_fmt == "MJPEG")
+            jpeg_q   = config.CAMERA_JPEG_QUALITY
+
+            # ── Encode thread ───────────────────────────────────────────
+            # Separating capture (ISP-bound) from encode (CPU-bound) lets the
+            # ISP keep running full-speed even when cv2 encode takes >1 frame.
+            # queue maxsize=1: if encode falls behind, always drop the OLDER
+            # frame (keep the newest) — minimises visual latency.
+            _enc_q: queue.Queue = queue.Queue(maxsize=1)
+
+            def _encode_worker():
+                while True:
+                    item = _enc_q.get()
+                    if item is None:   # poison pill — stop signal
+                        break
+                    raw, is_hw = item
+                    try:
+                        if is_hw:
+                            # Hardware MJPEG: raw bytes are already a valid JPEG
+                            jpeg_bytes = bytes(raw)
+                        elif _use_cv2:
+                            bgr = _cv2.cvtColor(raw, _cv2.COLOR_YUV420p2BGR)
+                            if rotation == 90:
+                                bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
+                            elif rotation == 180:
+                                bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
+                            elif rotation == 270:
+                                bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
+                            _, buf = _cv2.imencode(
+                                ".jpg", bgr,
+                                [_cv2.IMWRITE_JPEG_QUALITY, jpeg_q],
+                            )
+                            jpeg_bytes = buf.tobytes()
+                        else:
+                            jpeg_bytes = None   # should not happen
+
+                        if jpeg_bytes:
+                            with self._cond:
+                                self._frame = jpeg_bytes
+                                self._frame_seq += 1
+                                self._cond.notify_all()
+                    except Exception as enc_exc:
+                        logger.debug("CameraReader: encode error: %s", enc_exc)
+
+            _enc_thread = threading.Thread(
+                target=_encode_worker, name="camera-encode", daemon=True
+            )
+            _enc_thread.start()
 
             while self._running:
-                # Capture from lores stream (small, ISP-downscaled) for fast MJPEG.
-                # Falls back to main if lores unavailable.
+                raw = cam.capture_array("lores")
+
+                # Non-blocking put: if encode queue is full, discard the OLDER
+                # item and enqueue the fresh frame (always show latest).
                 try:
-                    array = cam.capture_array("lores")
-                    is_lores = True
-                except Exception:
-                    array = cam.capture_array("main")
-                    is_lores = False
-
-                # ── Colour channel handling ───────────────────────────────
-                if is_lores:
-                    # YUV420 — convert to BGR with cv2 (fast hardware-friendly path)
-                    if _use_cv2:
-                        bgr = _cv2.cvtColor(array, _cv2.COLOR_YUV420p2BGR)
-                        if rotation == 90:
-                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
-                        elif rotation == 180:
-                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
-                        elif rotation == 270:
-                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
-                        _, buf = _cv2.imencode(
-                            ".jpg", bgr,
-                            [_cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
-                        )
-                        jpeg_bytes = buf.tobytes()
-                    else:
-                        # PIL fallback: convert YUV manually via cv2-less path
-                        from PIL import Image  # type: ignore
-                        import numpy as np
-                        h, w = array.shape[0] * 2 // 3, array.shape[1]
-                        y = array[:h, :]
-                        u = array[h:h + h//4, :].reshape(h//2, w//2)
-                        v = array[h + h//4:, :].reshape(h//2, w//2)
-                        u = np.repeat(np.repeat(u, 2, axis=0), 2, axis=1)
-                        v = np.repeat(np.repeat(v, 2, axis=0), 2, axis=1)
-                        yuv = np.stack([y, u, v], axis=2).astype(np.float32)
-                        rgb = np.clip(
-                            yuv @ [[1,0,1.402],[1,-0.344,-0.714],[1,1.772,0]] - [0,128*0.344+128*0.714, 179.456],
-                            0, 255
-                        ).astype(np.uint8)
-                        _buf = io.BytesIO()
-                        Image.fromarray(rgb).save(_buf, format="JPEG",
-                                                   quality=config.CAMERA_JPEG_QUALITY)
-                        jpeg_bytes = _buf.getvalue()
-                else:
-                    # main stream RGB888
-                    if array.ndim == 3 and array.shape[2] == 4:
-                        array = array[:, :, :3][:, :, ::-1].copy()
-                    elif getattr(config, "CAMERA_SWAP_RB", False):
-                        array = array[:, :, ::-1].copy()
-
-                    if _use_cv2:
-                        bgr = array[:, :, ::-1]
-                        if rotation == 90:
-                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
-                        elif rotation == 180:
-                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
-                        elif rotation == 270:
-                            bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
-                        _, buf = _cv2.imencode(
-                            ".jpg", bgr,
-                            [_cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
-                        )
-                        jpeg_bytes = buf.tobytes()
-                    else:
-                        from PIL import Image  # type: ignore
-                        img = Image.fromarray(array, mode="RGB")
-                        _buf = io.BytesIO()
-                        img.save(_buf, format="JPEG", quality=config.CAMERA_JPEG_QUALITY)
-                        jpeg_bytes = _buf.getvalue()
-
-                with self._cond:
-                    self._frame = jpeg_bytes
-                    self._frame_seq += 1
-                    self._cond.notify_all()
+                    _enc_q.put_nowait((raw, hw_mjpeg))
+                except queue.Full:
+                    try:
+                        _enc_q.get_nowait()   # drop stale frame
+                    except queue.Empty:
+                        pass
+                    _enc_q.put_nowait((raw, hw_mjpeg))
 
         finally:
+            # Send poison pill and wait briefly for encode thread
+            try:
+                _enc_q.put_nowait(None)
+            except Exception:
+                pass
             self._cam = None
             cam.stop()
             cam.close()
