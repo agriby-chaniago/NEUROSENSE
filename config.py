@@ -154,10 +154,10 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 # To verify CSI: libcamera-hello --list-cameras
 # To verify USB: ls /dev/video*
 CAMERA_ENABLED       = True
-CAMERA_WIDTH         = 1920   # Arducam 64MP: gunakan 1920x1080 untuk streaming
-CAMERA_HEIGHT        = 1080   #   (full 9152×6944 terlalu berat untuk Flask MJPEG)
-CAMERA_FRAMERATE     = 10     # fps — 64MP perlu downscale besar, 10fps lebih stabil
-CAMERA_JPEG_QUALITY  = 85     # JPEG quality 1–95
+CAMERA_WIDTH         = 1920   # Arducam 64MP: 1920x1080 untuk streaming
+CAMERA_HEIGHT        = 1080
+CAMERA_FRAMERATE     = 20     # fps — Pi 5 + PiSP handle 1080p@20fps dengan baik
+CAMERA_JPEG_QUALITY  = 80     # 80 = balance kualitas/kecepatan (was 85)
 CAMERA_ROTATION      = 0      # clockwise degrees: 0 / 90 / 180 / 270
 CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
 

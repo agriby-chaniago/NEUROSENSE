@@ -87,9 +87,10 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
             return Response("Camera not enabled", status=503)
 
         def generate():
-            interval = 1.0 / max(1, config.CAMERA_FRAMERATE)
             while True:
-                frame = _camera_reader.get_frame()
+                # Blocks until capture thread signals a new frame — zero delay.
+                # Falls back to last frame on timeout (keeps connection alive).
+                frame = _camera_reader.get_new_frame(timeout=0.5)
                 if frame is not None:
                     yield (
                         b"--frame\r\n"
@@ -97,7 +98,6 @@ def create_app(sensor_manager, camera_reader=None) -> Flask:
                         + frame
                         + b"\r\n"
                     )
-                time.sleep(interval)
 
         return Response(
             generate(),

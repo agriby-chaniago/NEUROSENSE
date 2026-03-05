@@ -40,8 +40,11 @@ class CameraReader:
     """
 
     def __init__(self):
-        self._lock = threading.Lock()
+        # threading.Condition wraps a lock; notify_all() wakes the MJPEG
+        # generator the instant a new frame arrives — no polling needed.
+        self._cond = threading.Condition()
         self._frame: Optional[bytes] = None
+        self._frame_seq: int = 0   # increments every new frame
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._backend: Optional[str] = None   # "picamera2" | "opencv"
@@ -65,6 +68,8 @@ class CameraReader:
     def stop(self) -> None:
         """Signal the capture thread to stop and wait for it."""
         self._running = False
+        with self._cond:
+            self._cond.notify_all()   # unblock any waiting get_new_frame()
         if self._thread is not None:
             self._thread.join(timeout=6.0)
         logger.info("CameraReader: stopped")
@@ -73,7 +78,20 @@ class CameraReader:
 
     def get_frame(self) -> Optional[bytes]:
         """Return latest JPEG frame bytes, or None if not yet available."""
-        with self._lock:
+        with self._cond:
+            return self._frame
+
+    def get_new_frame(self, timeout: float = 0.25) -> Optional[bytes]:
+        """
+        Block until a NEW frame is captured (or timeout).
+        Used by the MJPEG generator to yield frames with zero polling delay.
+        """
+        with self._cond:
+            seq = self._frame_seq
+            self._cond.wait_for(
+                lambda: self._frame_seq != seq or not self._running,
+                timeout=timeout,
+            )
             return self._frame
 
     @property
@@ -84,7 +102,7 @@ class CameraReader:
     @property
     def ready(self) -> bool:
         """True once the first frame has been captured."""
-        with self._lock:
+        with self._cond:
             return self._frame is not None
 
     def health(self) -> dict:
@@ -149,7 +167,9 @@ class CameraReader:
                 "format": "RGB888",
             },
             controls={
-                "FrameDurationLimits": (frame_us, frame_us),
+                # Allow dynamic range: libcamera picks the fastest achievable
+                # rate up to CAMERA_FRAMERATE. Avoids hard-locking to one fps.
+                "FrameDurationLimits": (frame_us, frame_us * 3),
                 "AwbEnable": True,
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
@@ -199,39 +219,59 @@ class CameraReader:
         )
 
         try:
-            from PIL import Image  # type: ignore
+            # Import cv2 once — much faster JPEG encoding than PIL
+            try:
+                import cv2 as _cv2
+                _use_cv2 = True
+            except ImportError:
+                from PIL import Image  # type: ignore
+                _use_cv2 = False
 
             while self._running:
                 array = cam.capture_array("main")
 
                 # ── Colour channel handling ───────────────────────────────
-                # Arducam 64MP returns RGB888 data in correct RGB order.
-                # Some drivers/configs return BGRA (4-ch) or BGR — handle all:
                 if array.ndim == 3 and array.shape[2] == 4:
-                    # XBGR / BGRA — strip alpha, then R↔B swap
+                    # XBGR/BGRA — strip alpha, then R↔B swap
                     array = array[:, :, :3][:, :, ::-1].copy()
                 elif getattr(config, "CAMERA_SWAP_RB", False):
-                    # Explicit R↔B swap (enabled in config if skin is blue)
                     array = array[:, :, ::-1].copy()
-                # else: RGB888 data is correct as-is — no swap needed
+                # else: RGB correct as-is
 
-                img = Image.fromarray(array, mode="RGB")
-
-                # Software rotation fallback (if libcamera Transform unavailable)
+                # ── Software rotation ──────────────────────────────────
                 rotation = getattr(config, "CAMERA_ROTATION", 0)
-                if rotation == 90:
-                    img = img.rotate(-90, expand=True)
-                elif rotation == 180:
-                    img = img.rotate(180, expand=True)
-                elif rotation == 270:
-                    img = img.rotate(90, expand=True)
 
-                buf = io.BytesIO()
-                img.save(buf, format="JPEG", quality=config.CAMERA_JPEG_QUALITY)
-                jpeg_bytes = buf.getvalue()
+                # ── JPEG encoding ─────────────────────────────────────
+                if _use_cv2:
+                    # cv2 expects BGR; array is RGB — flip channels
+                    bgr = array[:, :, ::-1]
+                    if rotation == 90:
+                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
+                    elif rotation == 180:
+                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
+                    elif rotation == 270:
+                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
+                    _, buf = _cv2.imencode(
+                        ".jpg", bgr,
+                        [_cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
+                    )
+                    jpeg_bytes = buf.tobytes()
+                else:
+                    img = Image.fromarray(array, mode="RGB")
+                    if rotation == 90:
+                        img = img.rotate(-90, expand=True)
+                    elif rotation == 180:
+                        img = img.rotate(180, expand=True)
+                    elif rotation == 270:
+                        img = img.rotate(90, expand=True)
+                    _buf = io.BytesIO()
+                    img.save(_buf, format="JPEG", quality=config.CAMERA_JPEG_QUALITY)
+                    jpeg_bytes = _buf.getvalue()
 
-                with self._lock:
+                with self._cond:
                     self._frame = jpeg_bytes
+                    self._frame_seq += 1
+                    self._cond.notify_all()
 
         finally:
             cam.stop()
@@ -278,7 +318,6 @@ class CameraReader:
 
         try:
             while self._running:
-                t0 = time.monotonic()
                 ok, frame = cap.read()
                 if ok:
                     if rotate_code is not None:
@@ -288,12 +327,9 @@ class CameraReader:
                         ".jpg", frame,
                         [cv2.IMWRITE_JPEG_QUALITY, config.CAMERA_JPEG_QUALITY],
                     )
-                    with self._lock:
+                    with self._cond:
                         self._frame = buf.tobytes()
-
-                elapsed = time.monotonic() - t0
-                wait = interval - elapsed
-                if wait > 0:
-                    time.sleep(wait)
+                        self._frame_seq += 1
+                        self._cond.notify_all()
         finally:
             cap.release()
