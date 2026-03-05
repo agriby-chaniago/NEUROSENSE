@@ -175,24 +175,20 @@ class CameraReader:
         cam.configure(video_cfg)
         cam.start()
 
-        # ── Autofocus (Arducam 64MP AF and other AF modules) ─────────────
-        # Must be called AFTER cam.start(). Using integer constants avoids
-        # libcamera enum import failures on some Arducam driver versions.
-        #   AfMode:   0=Manual, 1=Auto(one-shot), 2=Continuous
-        #   AfSpeed:  0=Normal, 1=Fast
-        #   AfTrigger: 0=Start, 1=Cancel
+        # ── Autofocus (Arducam 64MP AF / OV64A40) ────────────────────────
+        # Must be called AFTER cam.start(). Integer constants used to avoid
+        # libcamera enum import issues on some Arducam driver versions.
+        #   AfMode: 0=Manual, 1=Auto(one-shot), 2=Continuous
+        #   AfSpeed: 0=Normal, 1=Fast
+        # Note: AfTrigger is NOT set — OV64A40 via PiSP rejects it before the
+        # AF algorithm initialises; Continuous mode auto-starts scanning.
         if getattr(config, "CAMERA_AUTOFOCUS", False):
             try:
-                # First do a one-shot scan so the lens settles on a subject,
-                # then switch to continuous tracking.
-                cam.set_controls({"AfMode": 1, "AfTrigger": 0})
-                time.sleep(0.8)   # let one-shot AF converge (~0.5-1 s typical)
                 cam.set_controls({"AfMode": 2, "AfSpeed": 1})
-                logger.info("CameraReader: autofocus enabled (Arducam 64MP AF)")
+                logger.info("CameraReader: continuous autofocus enabled (Arducam 64MP AF)")
             except Exception as af_exc:
                 logger.warning(
-                    "CameraReader: could not enable AF (module may not support it): %s",
-                    af_exc,
+                    "CameraReader: could not enable AF: %s", af_exc,
                 )
 
         self._backend = "picamera2"
