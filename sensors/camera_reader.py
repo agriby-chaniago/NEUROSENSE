@@ -258,20 +258,61 @@ class CameraReader:
         )
 
         try:
-            # Import cv2 once — much faster JPEG encoding than PIL
+            # Import cv2 — faster JPEG encoding. PIL+numpy used as fallback.
             try:
                 import cv2 as _cv2
                 _use_cv2 = True
+                logger.info("CameraReader: using cv2 for JPEG encoding")
             except ImportError:
-                from PIL import Image  # type: ignore
                 _use_cv2 = False
+                logger.info("CameraReader: cv2 not found, using PIL+numpy fallback")
+
+            import numpy as _np
+            from PIL import Image as _Image
 
             rotation = getattr(config, "CAMERA_ROTATION", 0)
             jpeg_q   = config.CAMERA_JPEG_QUALITY
 
+            def _yuv420_to_jpeg(raw: "_np.ndarray") -> bytes:
+                """Convert YUV420 numpy array to JPEG bytes."""
+                if _use_cv2:
+                    bgr = _cv2.cvtColor(raw, _cv2.COLOR_YUV420p2BGR)
+                    if rotation == 90:
+                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
+                    elif rotation == 180:
+                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
+                    elif rotation == 270:
+                        bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
+                    _, buf = _cv2.imencode(
+                        ".jpg", bgr, [_cv2.IMWRITE_JPEG_QUALITY, jpeg_q]
+                    )
+                    return buf.tobytes()
+                else:
+                    # PIL + numpy fallback — no cv2 required
+                    h_yuv, w = raw.shape[:2]
+                    h = h_yuv * 2 // 3
+                    y = raw[:h,           :].astype(_np.float32)
+                    u = raw[h:h+h//4,     :].reshape(h//2, w//2).astype(_np.float32) - 128
+                    v = raw[h+h//4:h+h//2, :].reshape(h//2, w//2).astype(_np.float32) - 128
+                    u = _np.repeat(_np.repeat(u, 2, axis=0), 2, axis=1)
+                    v = _np.repeat(_np.repeat(v, 2, axis=0), 2, axis=1)
+                    r = _np.clip(y + 1.402  * v,                    0, 255).astype(_np.uint8)
+                    g = _np.clip(y - 0.3441 * u - 0.7141 * v,      0, 255).astype(_np.uint8)
+                    b = _np.clip(y + 1.772  * u,                    0, 255).astype(_np.uint8)
+                    img = _Image.fromarray(_np.stack([r, g, b], axis=2))
+                    if rotation == 90:
+                        img = img.rotate(-90, expand=True)
+                    elif rotation == 180:
+                        img = img.rotate(180, expand=True)
+                    elif rotation == 270:
+                        img = img.rotate(90, expand=True)
+                    buf = io.BytesIO()
+                    img.save(buf, format="JPEG", quality=jpeg_q)
+                    return buf.getvalue()
+
             # ── Encode thread ───────────────────────────────────────────
             # Separating capture (ISP-bound) from encode (CPU-bound) lets the
-            # ISP keep running full-speed even when cv2 encode takes >1 frame.
+            # ISP keep running full-speed even when encode takes >1 frame.
             # queue maxsize=1: always drop the OLDER frame, keep the newest.
             _enc_q: queue.Queue = queue.Queue(maxsize=1)
 
@@ -281,27 +322,11 @@ class CameraReader:
                     if raw is None:   # poison pill — stop signal
                         break
                     try:
-                        if _use_cv2:
-                            bgr = _cv2.cvtColor(raw, _cv2.COLOR_YUV420p2BGR)
-                            if rotation == 90:
-                                bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
-                            elif rotation == 180:
-                                bgr = _cv2.rotate(bgr, _cv2.ROTATE_180)
-                            elif rotation == 270:
-                                bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_COUNTERCLOCKWISE)
-                            _, buf = _cv2.imencode(
-                                ".jpg", bgr,
-                                [_cv2.IMWRITE_JPEG_QUALITY, jpeg_q],
-                            )
-                            jpeg_bytes = buf.tobytes()
-                        else:
-                            jpeg_bytes = None   # cv2 not available
-
-                        if jpeg_bytes:
-                            with self._cond:
-                                self._frame = jpeg_bytes
-                                self._frame_seq += 1
-                                self._cond.notify_all()
+                        jpeg_bytes = _yuv420_to_jpeg(raw)
+                        with self._cond:
+                            self._frame = jpeg_bytes
+                            self._frame_seq += 1
+                            self._cond.notify_all()
                     except Exception as enc_exc:
                         logger.debug("CameraReader: encode error: %s", enc_exc)
 
