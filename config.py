@@ -168,6 +168,11 @@ CAMERA_SHARPNESS     = 2.0
 # False untuk fixed-focus (adjust lensa ring secara manual).
 CAMERA_AUTOFOCUS     = True
 
+# R↔B channel swap.
+# Arducam 64MP (format RGB888): data sudah dalam urutan RGB yang benar → False.
+# Jika kulit masih biru setelah restart, ganti ke True.
+CAMERA_SWAP_RB       = False
+
 # ─── Active Sensors ────────────────────────────────────────────────────────
 # To disable a sensor, set its entry to False.
 # sensor_manager reads this dict — adding a new sensor only needs a new key here

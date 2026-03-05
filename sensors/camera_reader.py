@@ -143,22 +143,17 @@ class CameraReader:
         frame_us = int(1_000_000 / max(1, config.CAMERA_FRAMERATE))
         video_cfg = cam.create_video_configuration(
             main={
-                # BGR888: explicit flip below guarantees correct RGB output
-                # (prevents blue-skin caused by BGR/RGB byte-order mismatch)
+                # Request RGB888.  Arducam 64MP ISP delivers RGB byte order.
+                # If skin appears blue, set CAMERA_SWAP_RB = True in config.py.
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
-                "format": "BGR888",
+                "format": "RGB888",
             },
             controls={
                 "FrameDurationLimits": (frame_us, frame_us),
-                # Auto-white-balance — prevents blue/orange colour casts
                 "AwbEnable": True,
-                "AwbMode":   0,       # 0 = Auto
-                # Sharpness: 1.0 = camera default, 2.0 = noticeably sharper
-                "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
-                # AeEnable: automatic exposure for Arducam
                 "AeEnable":  True,
+                "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
             },
-            # buffer_count=4 keeps latency low on 64MP
             buffer_count=4,
         )
 
@@ -211,14 +206,18 @@ class CameraReader:
             from PIL import Image  # type: ignore
 
             while self._running:
-                # capture_array returns an np.ndarray (BGR888 — see format above)
                 array = cam.capture_array("main")
 
-                # ── BGR → RGB channel swap ────────────────────────────────
-                # Many Arducam / libcamera modules return BGR byte order even
-                # when an RGB format is requested.  Using BGR888 + explicit
-                # flip guarantees correct colour (prevents blue-skin artefact).
-                array = array[:, :, ::-1].copy()   # BGR → RGB
+                # ── Colour channel handling ───────────────────────────────
+                # Arducam 64MP returns RGB888 data in correct RGB order.
+                # Some drivers/configs return BGRA (4-ch) or BGR — handle all:
+                if array.ndim == 3 and array.shape[2] == 4:
+                    # XBGR / BGRA — strip alpha, then R↔B swap
+                    array = array[:, :, :3][:, :, ::-1].copy()
+                elif getattr(config, "CAMERA_SWAP_RB", False):
+                    # Explicit R↔B swap (enabled in config if skin is blue)
+                    array = array[:, :, ::-1].copy()
+                # else: RGB888 data is correct as-is — no swap needed
 
                 img = Image.fromarray(array, mode="RGB")
 
