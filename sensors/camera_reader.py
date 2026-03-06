@@ -234,7 +234,12 @@ class CameraReader:
                 "format": lores_fmt,
             },
             controls={
-                "FrameDurationLimits": (frame_us, frame_us),   # hard-lock fps
+                # Hard-lock ISP to exactly CAMERA_FRAMERATE fps.
+                "FrameDurationLimits": (frame_us, frame_us),
+                # Cap AE's maximum exposure time to one frame period.
+                # Without this, AE can request ExposureTime > frame_us which
+                # silently overrides FrameDurationLimits and drops fps to ~45.
+                "ExposureTimeRange": (1000, frame_us),
                 "AwbEnable": True,
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
