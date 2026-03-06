@@ -190,8 +190,19 @@ class MAX30102Reader(BaseSensor):
             else:
                 # Update EMA only on valid reads
                 if hr_valid:
-                    self._ema_hr = hr if self._ema_hr is None else \
-                        self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
+                    # Require 2 consecutive valid reads before seeding EMA.
+                    # The very first valid read after a 10-15 s settling period can
+                    # be wrong (e.g. lag=20 → 73 BPM when true HR is 90 BPM) because
+                    # the autocorr's reverse-harmonic check cannot fire for lag=20
+                    # (half_lag=10==lag_min is excluded).  Skipping the first lonely
+                    # seed prevents a 73→93 BPM EMA flash on the dashboard.
+                    if self._ema_hr is None:
+                        if self._prev_hr_bpm is not None and abs(hr - self._prev_hr_bpm) <= 15.0:
+                            # Second consecutive valid read within 15 BPM — seed EMA now.
+                            self._ema_hr = 0.5 * (hr + self._prev_hr_bpm)
+                        # else: first valid read, hold it in prev_hr_bpm; don't seed yet
+                    else:
+                        self._ema_hr = self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
                     self._reject_count = 0   # good read — reset counter
                     # SpO2 stability gate: count consecutive reads within ±8 BPM
                     if self._prev_hr_bpm is not None and abs(hr - self._prev_hr_bpm) <= 8.0:
@@ -209,8 +220,19 @@ class MAX30102Reader(BaseSensor):
                         self._ema_hr   = None
                         self._ema_spo2 = None
                 if spo2_valid and self._spo2_guard_count >= self._SPO2_MIN_STABLE and not ir_drifting:
+                    prev_spo2 = self._ema_spo2
                     self._ema_spo2 = spo2 if self._ema_spo2 is None else \
                         self._EMA_A * spo2 + (1 - self._EMA_A) * self._ema_spo2
+                    if prev_spo2 is None:
+                        logger.info(
+                            "MAX30102 SpO2 first reading: %.1f%% (raw=%.0f%%)",
+                            self._ema_spo2, spo2,
+                        )
+                    elif abs(self._ema_spo2 - prev_spo2) >= 1.0:
+                        logger.info(
+                            "MAX30102 SpO2 EMA: %.1f%%  (raw=%.0f%%)",
+                            self._ema_spo2, spo2,
+                        )
                 elif spo2_valid:
                     logger.debug(
                         "MAX30102 SpO2 deferred: HR stable=%d/%d  ir_drifting=%s",
