@@ -29,6 +29,7 @@ import csv
 import json
 import logging
 import os
+import queue
 import threading
 import time
 from datetime import datetime, timezone
@@ -303,15 +304,51 @@ class SessionManager:
             ts_writer = csv.writer(ts_fh)
             ts_writer.writerow(["frame_idx", "timestamp_ms"])
 
+            # ── Async disk-write thread ──────────────────────────────────────
+            # Separating frame capture from disk-I/O prevents SD card latency
+            # (can be 10-30ms per write) from causing frame drops in the
+            # get_new_frame() loop.  Queue holds up to 4 seconds of frames.
+            _write_q: queue.Queue = queue.Queue(
+                maxsize=int(getattr(config, "CAMERA_FRAMERATE", 45) * 4)
+            )
+
+            def _disk_writer():
+                while True:
+                    item = _write_q.get()
+                    if item is None:  # poison pill
+                        break
+                    idx, frame_bytes, ts_ms = item
+                    try:
+                        (frames_dir / f"{idx:06d}.jpg").write_bytes(frame_bytes)
+                        ts_writer.writerow([idx, ts_ms])
+                        ts_fh.flush()
+                    except Exception as exc:
+                        logger.error("Session disk-write error frame %d: %s", idx, exc)
+
+            _disk_thread = threading.Thread(
+                target=_disk_writer, name="session-disk", daemon=True
+            )
+            _disk_thread.start()
+
             while not stop_event.is_set():
                 frame = self._camera_reader.get_new_frame(timeout=0.5)
                 if frame is None:
                     continue
-                ts_ms = int(time.time() * 1000)  # Unix epoch ms — capture before disk write
-                (frames_dir / f"{frame_count:06d}.jpg").write_bytes(frame)
-                ts_writer.writerow([frame_count, ts_ms])
-                ts_fh.flush()
-                frame_count += 1
+                ts_ms = int(time.time() * 1000)  # capture timestamp before any I/O
+                try:
+                    _write_q.put_nowait((frame_count, frame, ts_ms))
+                    frame_count += 1
+                except queue.Full:
+                    logger.warning(
+                        "Session %s: disk-write queue full — frame %d dropped "
+                        "(disk too slow)",
+                        metadata["session_id"], frame_count,
+                    )
+                    # do NOT increment frame_count — keeps file numbering contiguous
+
+            # Drain the write queue before exiting
+            _write_q.put(None)   # poison pill
+            _disk_thread.join(timeout=120.0)
 
         with self._lock:
             if self._active:

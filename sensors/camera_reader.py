@@ -321,17 +321,24 @@ class CameraReader:
             jpeg_q   = config.CAMERA_JPEG_QUALITY
 
             def _encode_frame(raw: "_np.ndarray") -> bytes:
-                """Convert RGB888 lores array to JPEG bytes."""
-                # OV64A40 + PiSP sends BGR data inside RGB888 container.
-                # CAMERA_SWAP_RB=True corrects this (same logic as capture_snapshot).
+                """Convert lores array to JPEG bytes with minimal copying."""
                 arr = raw
                 if arr.ndim == 3 and arr.shape[2] == 4:
                     arr = arr[:, :, :3]  # strip alpha
-                if getattr(config, "CAMERA_SWAP_RB", False):
-                    arr = arr[:, :, ::-1]  # now correct RGB
-                # cv2 expects BGR
+
+                swap_rb = getattr(config, "CAMERA_SWAP_RB", False)
+
                 if _use_cv2:
-                    bgr = arr[:, :, ::-1]
+                    # OV64A40 + PiSP delivers BGR data inside RGB888 container.
+                    # cv2 also expects BGR input.
+                    # When SWAP_RB=True: the two channel-flips (correct→RGB, then→BGR
+                    # for cv2) cancel each other — raw array IS already BGR for cv2.
+                    # Skip both flips and just make the array contiguous (one copy).
+                    # When SWAP_RB=False: ISP delivers true RGB, flip once for cv2.
+                    if swap_rb:
+                        bgr = _np.ascontiguousarray(arr)          # already BGR
+                    else:
+                        bgr = _np.ascontiguousarray(arr[:, :, ::-1])  # RGB→BGR
                     if rotation == 90:
                         bgr = _cv2.rotate(bgr, _cv2.ROTATE_90_CLOCKWISE)
                     elif rotation == 180:
@@ -343,8 +350,12 @@ class CameraReader:
                     )
                     return buf.tobytes()
                 else:
-                    # PIL fallback: arr is RGB, PIL.fromarray expects RGB
-                    img = _Image.fromarray(arr, mode="RGB")
+                    # PIL expects RGB
+                    if swap_rb:
+                        img_arr = _np.ascontiguousarray(arr[:, :, ::-1])  # BGR→RGB
+                    else:
+                        img_arr = _np.ascontiguousarray(arr)               # already RGB
+                    img = _Image.fromarray(img_arr, mode="RGB")
                     if rotation == 90:
                         img = img.rotate(-90, expand=True)
                     elif rotation == 180:
@@ -358,8 +369,10 @@ class CameraReader:
             # ── Encode thread ───────────────────────────────────────────
             # Separating capture (ISP-bound) from encode (CPU-bound) lets the
             # ISP keep running full-speed even when encode takes >1 frame.
-            # queue maxsize=1: always drop the OLDER frame, keep the newest.
-            _enc_q: queue.Queue = queue.Queue(maxsize=1)
+            # queue maxsize=2: absorbs brief encode spikes (e.g. GC pause)
+            # without dropping. Capture thread always discards oldest when full
+            # so live-view latency stays bounded at 2 frames (~44ms at 45fps).
+            _enc_q: queue.Queue = queue.Queue(maxsize=2)
 
             def _encode_worker():
                 while True:
