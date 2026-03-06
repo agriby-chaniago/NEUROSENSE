@@ -269,22 +269,13 @@ class CameraReader:
         #   AfSpeed: 0=Normal, 1=Fast
         # Note: AfTrigger is NOT set — OV64A40 via PiSP rejects it before the
         # AF algorithm initialises; Continuous mode auto-starts scanning.
-        # Cap AE's maximum exposure time to one frame period so auto-exposure
-        # cannot silently extend the frame duration and drop fps below the target.
-        # ExposureTimeRange is not advertised by all libcamera/PiSP versions, so
-        # wrap in try/except — failure is non-fatal.
+        # Re-apply FrameDurationLimits via set_controls() after start() as well.
+        # On some PiSP builds the config controls dict value is silently adjusted;
+        # a second post-start set_controls() ensures it really sticks.
         try:
-            cam.set_controls({"ExposureTimeRange": (100, frame_us)})
-            logger.info(
-                "CameraReader: ExposureTimeRange capped to (100, %d µs) to lock fps",
-                frame_us,
-            )
-        except Exception as etr_exc:
-            logger.warning(
-                "CameraReader: ExposureTimeRange not supported (%s) — "
-                "fps may drop below %d in low light",
-                etr_exc, config.CAMERA_FRAMERATE,
-            )
+            cam.set_controls({"FrameDurationLimits": (frame_us, frame_us)})
+        except Exception as fdl_exc:
+            logger.warning("CameraReader: FrameDurationLimits post-start failed: %s", fdl_exc)
 
         if getattr(config, "CAMERA_AUTOFOCUS", False):
             try:

@@ -183,9 +183,13 @@ CAMERA_SWAP_RB       = True
 # Dataset / fixed-exposure mode
 # Set CAMERA_FIXED_EXPOSURE_US > 0 to disable auto-exposure (prevents luminance
 # flicker between frames, critical for micro-expression temporal features).
-# Example: 8333 ≈ 1/120 s shutter at 60 fps.  0 = leave AE enabled (default).
-CAMERA_FIXED_EXPOSURE_US = 0       # microseconds; 0 = AE enabled
-CAMERA_ANALOGUE_GAIN     = 2.0     # analogue gain when fixed-exposure is active
+# ALSO required to lock fps at 60: AE will otherwise request ExposureTime > one
+# frame period (≈22ms indoor) which silently overrides FrameDurationLimits and
+# drops fps to ~45. Setting ExposureTime ≤ frame_us (16666µs at 60fps) is the
+# only reliable way to guarantee 60fps on OV64A40 / PiSP.
+# 16000 µs ≈ 1/62.5 s — gives ~3% headroom below the 60fps frame window.
+CAMERA_FIXED_EXPOSURE_US = 16000   # microseconds; 0 = AE enabled (drops to 45fps indoors)
+CAMERA_ANALOGUE_GAIN     = 4.0     # analogue gain; 4.0 suits indoor fluorescent light
 
 # ─── Experiment Settings ───────────────────────────────────────────────────
 # All experiment data is saved under DATA_DIR/sessions/{session_id}/
