@@ -38,7 +38,7 @@ def calc_hr_and_spo2(
     ir_data: list,
     red_data: list,
     sampling_freq: int = 100,
-) -> tuple[float, bool, float, bool]:
+) -> tuple[float, bool, float, bool, float]:
     """
     Calculate heart rate (BPM) and SpO2 (%) from a buffer of IR + Red samples.
 
@@ -54,14 +54,16 @@ def calc_hr_and_spo2(
 
     Returns
     -------
-    (heart_rate_bpm, hr_valid, spo2_percent, spo2_valid)
+    (heart_rate_bpm, hr_valid, spo2_percent, spo2_valid, best_corr)
+        best_corr: normalised autocorrelation at the winning lag (0.0–1.0).
+        Caller can use this to gate EMA seeding (e.g. require >= 0.65).
     """
     ir  = np.array(ir_data,  dtype=np.float64)
     red = np.array(red_data, dtype=np.float64)
     n   = len(ir)
 
     if n < 50:
-        return -999.0, False, -999.0, False
+        return -999.0, False, -999.0, False, 0.0
 
     # ── 1. Remove DC (mean-difference) ─────────────────────────────────────
     ir_mean  = np.mean(ir)
@@ -72,7 +74,7 @@ def calc_hr_and_spo2(
         _log.warning(
             "MAX30102: no finger / weak signal (ir_mean=%.0f, need >5000)", ir_mean
         )
-        return -999.0, False, -999.0, False
+        return -999.0, False, -999.0, False, 0.0
 
     ir_ac  = ir  - ir_mean
     red_ac = red - red_mean
@@ -87,7 +89,7 @@ def calc_hr_and_spo2(
             "MAX30102 motion artifact: AC_RMS/DC=%.1f%% (need ≤15%%), skipping buffer",
             ac_rms_ratio * 100,
         )
-        return -999.0, False, -999.0, False
+        return -999.0, False, -999.0, False, 0.0
 
     # ── Hanning window + detrend ───────────────────────────────────────────
     #    Respiratory amplitude modulation makes the PPG envelope vary slowly
@@ -138,7 +140,7 @@ def calc_hr_and_spo2(
     #      lag == lag_min → reported HR 150 BPM (virtually never true at rest)
     #      lag == lag_max → reported HR 40 BPM (extremely slow / touching edge)
     if (best_lag == lag_min or best_lag == lag_max) and best_corr < 0.55:
-        return -999.0, False, -999.0, False
+        return -999.0, False, -999.0, False, 0.0
 
     # ── Harmonic correction (T/2 dicrotic-notch peak) ───────────────────────
     #    If argmax landed on a short lag (implausibly high HR), check whether
@@ -164,7 +166,7 @@ def calc_hr_and_spo2(
     # Post-harmonic boundary guard: harmonic doubling can push best_lag onto
     # lag_max (e.g. original=19 passes pre-harmonic guard, doubles to 38==lag_max).
     if best_lag == lag_max and best_corr < 0.55:
-        return -999.0, False, -999.0, False
+        return -999.0, False, -999.0, False, 0.0
 
     # ── Reverse-harmonic (sub-harmonic) guard ────────────────────────────────
     #    The dicrotic notch and respiratory sinus arrhythmia can produce a strong
@@ -218,7 +220,7 @@ def calc_hr_and_spo2(
     # Hanning window reduces peak height ~50% vs rectangular, so stable PPG
     # gives ~0.15–0.35 (was 0.30–0.55 without window). Pure noise ≈ 0.0.
     if best_corr < 0.10:
-        return -999.0, False, -999.0, False
+        return -999.0, False, -999.0, False, 0.0
 
     hr_bpm   = (sampling_freq / lag_float) * 60.0
     hr_valid = 40 <= hr_bpm <= 150
@@ -230,7 +232,7 @@ def calc_hr_and_spo2(
     #    (dicrotic notch at 2×, motion at other frequencies, wideband noise).
     k = int(round(n / lag_float))   # DFT bin of cardiac fundamental
     if k < 1 or k >= n // 2:
-        return hr_bpm, hr_valid, -999.0, False
+        return hr_bpm, hr_valid, -999.0, False, round(best_corr, 3)
 
     ir_fft  = np.fft.rfft(ir_ac)
     red_fft = np.fft.rfft(red_ac)
@@ -248,7 +250,7 @@ def calc_hr_and_spo2(
             "MAX30102 SpO2 rejected: ac signals too small (ac_ir=%.1f, ac_red=%.1f)",
             ac_ir, ac_red,
         )
-        return hr_bpm, hr_valid, -999.0, False
+        return hr_bpm, hr_valid, -999.0, False, round(best_corr, 3)
 
     # Perfusion index check: reject pure noise (AC/DC too low).
     # Normal PPG: 0.05%–15%. Pure noise: <0.01%.
@@ -258,7 +260,7 @@ def calc_hr_and_spo2(
             "MAX30102 SpO2 rejected: perfusion_index=%.4f%% (need >0.01%%)",
             pi_ir * 100,
         )
-        return hr_bpm, hr_valid, -999.0, False
+        return hr_bpm, hr_valid, -999.0, False, round(best_corr, 3)
 
     r = (ac_red / red_mean) / (ac_ir / ir_mean)
     _log.info(
@@ -273,12 +275,12 @@ def calc_hr_and_spo2(
             "MAX30102 SpO2 rejected: R=%.3f out of physiological range [0.30, 0.95]",
             r,
         )
-        return hr_bpm, hr_valid, -999.0, False
+        return hr_bpm, hr_valid, -999.0, False, round(best_corr, 3)
     r_idx    = max(0, min(int(r * 100), len(_SPO2_TABLE) - 1))
     spo2     = float(_SPO2_TABLE[r_idx])
     spo2_valid = hr_valid and (70.0 <= spo2 <= 100.0)
 
-    return round(hr_bpm, 1), hr_valid, spo2, spo2_valid
+    return round(hr_bpm, 1), hr_valid, spo2, spo2_valid, round(best_corr, 3)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────

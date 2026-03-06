@@ -192,7 +192,7 @@ class MAX30102Reader(BaseSensor):
                 "MAX30102 buffer: ir_mean=%.0f  red_mean=%.0f  samples=%d",
                 ir_mean_now, float(_np.mean(red_data)), len(ir_data),
             )
-            hr, hr_valid, spo2, spo2_valid = calc_hr_and_spo2(
+            hr, hr_valid, spo2, spo2_valid, hr_corr = calc_hr_and_spo2(
                 ir_data, red_data,
                 sampling_freq=config.MAX30102_SAMPLING_RATE_HZ // 4,  # SMP_AVE=4
             )
@@ -223,10 +223,23 @@ class MAX30102Reader(BaseSensor):
                     # (half_lag=10==lag_min is excluded).  Skipping the first lonely
                     # seed prevents a 73→93 BPM EMA flash on the dashboard.
                     if self._ema_hr is None:
-                        if self._prev_hr_bpm is not None and abs(hr - self._prev_hr_bpm) <= 15.0:
-                            # Second consecutive valid read within 15 BPM — seed EMA now.
+                        # Require corr >= 0.80 before seeding EMA for the first time.
+                        # At low sample counts (50-160 samples after fast-fill) autocorr
+                        # is weak (corr ≈ 0.12-0.75) and can lock on the wrong lag
+                        # (e.g. lag=20 → 73 BPM when true HR is 88 BPM).  A corr
+                        # threshold of 0.80 skips the lag=20 phase entirely: that peak
+                        # never exceeds corr≈0.75, while the correct lag=17 emerges at
+                        # corr≈0.856+ once ~170 samples accumulate.
+                        # ±20 BPM window (not ±15) to handle the lag=20→17 transition:
+                        # at the switch point, delta = |88.9-73.2| = 15.7 BPM which
+                        # just barely exceeds ±15 and would delay seeding by one extra
+                        # step (0.4 s).  ±20 catches the transition on the first read.
+                        if (self._prev_hr_bpm is not None
+                                and abs(hr - self._prev_hr_bpm) <= 20.0
+                                and hr_corr >= 0.80):
+                            # Second consecutive valid read, high-confidence — seed EMA.
                             self._ema_hr = 0.5 * (hr + self._prev_hr_bpm)
-                        # else: first valid read, hold it in prev_hr_bpm; don't seed yet
+                        # else: not confident enough yet; hold in prev_hr_bpm
                     else:
                         self._ema_hr = self._EMA_A * hr + (1 - self._EMA_A) * self._ema_hr
                     self._reject_count = 0   # good read — reset counter

@@ -77,7 +77,7 @@ class TestCalcHrAndSpo2:
         # Red: half AC amplitude of IR → R ≈ 0.5 (SpO2~98%), avoids R>0.95 gate
         dc = 100_000
         red = [int(dc + 0.5 * (v - dc)) for v in ir]
-        hr, hr_valid, spo2, spo2_valid = calc_hr_and_spo2(ir, red, sampling_freq=100)
+        hr, hr_valid, spo2, spo2_valid, _ = calc_hr_and_spo2(ir, red, sampling_freq=100)
         assert hr_valid, f"Expected valid HR, got {hr}"
         assert 50 <= hr <= 100, f"HR {hr} BPM out of expected range"
 
@@ -85,14 +85,14 @@ class TestCalcHrAndSpo2:
         """Very low IR signal → no finger detected."""
         ir  = [100] * 100   # below 5000 threshold
         red = [100] * 100
-        hr, hr_valid, spo2, spo2_valid = calc_hr_and_spo2(ir, red)
+        hr, hr_valid, spo2, spo2_valid, _ = calc_hr_and_spo2(ir, red)
         assert not hr_valid
         assert not spo2_valid
 
     def test_too_few_samples_returns_invalid(self):
         ir  = [50000] * 10
         red = [50000] * 10
-        hr, hr_valid, _, _ = calc_hr_and_spo2(ir, red)
+        hr, hr_valid, _, _, _ = calc_hr_and_spo2(ir, red)
         assert not hr_valid
 
 
