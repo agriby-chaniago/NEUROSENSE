@@ -173,7 +173,11 @@ class MAX30102Reader(BaseSensor):
             self._last_error = None
 
             # Finger removed → hard-reset EMA + ring buffer so display clears to —
-            finger_removed = (hr == -999.0 and not hr_valid)
+            # IMPORTANT: calc_hr_and_spo2 returns (-999, False) for BOTH "no finger" AND
+            # "motion artifact".  We must NOT clear the ring buffer on motion artifact —
+            # only when the IR mean actually drops (finger truly lifted).
+            # Use ir_mean_now < 5000 as the authoritative "finger absent" test.
+            finger_removed = (hr == -999.0 and not hr_valid and ir_mean_now < 5_000)
             if finger_removed:
                 self._ema_hr   = None
                 self._ema_spo2 = None

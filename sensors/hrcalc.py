@@ -166,6 +166,30 @@ def calc_hr_and_spo2(
     if best_lag == lag_max and best_corr < 0.55:
         return -999.0, False, -999.0, False
 
+    # ── Reverse-harmonic (sub-harmonic) guard ────────────────────────────────
+    #    The dicrotic notch and respiratory sinus arrhythmia can produce a strong
+    #    autocorrelation peak at lag ≈ 2 × true_cardiac_lag (half the true BPM).
+    #    Example: true HR=90 BPM → lag≈17; respiratory peak at lag≈32 (=~2×17).
+    #    If best_lag is in the "could-be-twice-the-true-lag" zone, check whether
+    #    lag//2 carries at least 50 % of the current peak's correlation.  If so,
+    #    the half-lag is the true fundamental — prefer it.
+    #    Only apply when best_lag > harmonic_min_lag (i.e. NOT already in the
+    #    forward-harmonic correction zone) to avoid double-correction.
+    if best_lag > harmonic_min_lag:
+        half_lag = best_lag // 2
+        if lag_min <= half_lag <= lag_max:
+            half_corr = float(autocorr[half_lag])
+            if half_corr >= 0.50 * best_corr and half_corr >= 0.10:
+                _log.info(
+                    "MAX30102 reverse-harmonic: lag %d (%.1f BPM) → half_lag %d (%.1f BPM)  "
+                    "corr %.3f→%.3f",
+                    best_lag, (sampling_freq / best_lag) * 60.0,
+                    half_lag,  (sampling_freq / half_lag)  * 60.0,
+                    best_corr, half_corr,
+                )
+                best_lag  = half_lag
+                best_corr = half_corr
+
     # ── Parabolic interpolation for sub-sample lag precision ─────────────────
     #    Quadratic fit around the argmax gives a fractional lag offset δ:
     #      δ = (α - γ) / (2(α - 2β + γ))   where α=R[k-1], β=R[k], γ=R[k+1]
