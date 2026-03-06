@@ -325,7 +325,6 @@ class CameraReader:
                     _exp_controls["AnalogueGain"] = float(_fixed_gain)
                 cam.set_controls(_exp_controls)
                 logger.info(
-                logger.info(
                     "CameraReader: fixed exposure mode — ExposureTime=%d µs, AnalogueGain=%s",
                     int(_fixed_exp), _fixed_gain if _fixed_gain > 0 else "auto",
                 )
