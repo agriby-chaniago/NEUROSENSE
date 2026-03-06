@@ -17,8 +17,11 @@ import config
 
 logger = logging.getLogger(__name__)
 
-# Effective FIFO rate = 25 Hz (SR=100 Hz / SMP_AVE=4) → 25 samples = 1 s per step.
-_STEP_SIZE = 25   # ~1 s at 25 Hz FIFO
+# Effective FIFO rate = 25 Hz (SR=100 Hz / SMP_AVE=4).
+# Smaller step = more frequent updates and faster first-result after finger placement.
+# 10 samples × (1/25 Hz) = 0.4 s per step.  Sensor manager calls read() in a loop
+# (MAX30102_INTERVAL_S=0.0) so this naturally runs at ~2.5 Hz update cadence.
+_STEP_SIZE = 10   # ~0.4 s at 25 Hz FIFO
 
 
 class MAX30102Reader(BaseSensor):
@@ -37,12 +40,13 @@ class MAX30102Reader(BaseSensor):
         # EMA smoothing — absorbs single-read jitter
         self._ema_hr:   float | None = None
         self._ema_spo2: float | None = None
-        self._EMA_A = 0.35   # weight for newest reading (higher = faster response)
+        self._EMA_A = 0.40   # weight for newest reading — 0.40 is more responsive than 0.35
+                             # while still smoothing ±5 BPM shot noise per step
         # Consecutive-reject counter: if the algorithm rejects N reads in a row
         # (noisy signal, bad placement), expire the stale EMA so the display
         # clears to — and buzzer stops firing on an old cached value.
         self._reject_count: int = 0
-        self._EMA_MAX_REJECTS = 3   # clear after 3 consecutive bad reads
+        self._EMA_MAX_REJECTS = 4   # clear after 4 consecutive bad reads (was 3)
         # SpO2 stability guard: require N consecutive reads with consistent HR
         # before updating SpO2 EMA.  Prevents bad R values during buffer
         # warm-up (settling data still in ring buffer after finger placement).
@@ -105,12 +109,40 @@ class MAX30102Reader(BaseSensor):
 
             import numpy as _np  # local import, lightweight
 
+            # ── Fast-fill: finger just placed ─────────────────────────────
+            # When the ring is nearly empty (≤ 2 × step = freshly cleared after
+            # finger removal) AND the IR mean is high (finger now present),
+            # read the remaining samples to reach MIN_SAMPLES in one shot.
+            # This cuts first-result latency from ~2 s (5 regular steps × 0.4 s)
+            # to whenever those samples accumulate in hardware (same 2 s worth of
+            # actual sensor data, but the reader collects it without the 5-call
+            # round-trip overhead and without waiting for the sensor-manager loop).
+            _quick_buf_len = len(self._ring_ir)
+            if _quick_buf_len < config.MAX30102_MIN_SAMPLES:
+                _ir_quick = float(_np.mean(list(self._ring_ir))) if _quick_buf_len else 0.0
+                _finger_just_placed = (
+                    _ir_quick >= 8_000                      # finger signal present
+                    and _quick_buf_len <= _STEP_SIZE * 2    # ring is freshly cleared
+                )
+                if _finger_just_placed:
+                    _fill_n = config.MAX30102_MIN_SAMPLES - _quick_buf_len
+                    logger.info(
+                        "MAX30102: finger detected (ir_mean=%.0f) — fast-filling %d samples",
+                        _ir_quick, _fill_n,
+                    )
+                    _red_fill, _ir_fill = self._sensor.read_sequential(
+                        sample_count=_fill_n
+                    )
+                    self._ring_ir.extend(_ir_fill)
+                    self._ring_red.extend(_red_fill)
+                else:
+                    logger.debug(
+                        "MAX30102 ring buffer filling: %d/%d samples",
+                        _quick_buf_len, config.MAX30102_MIN_SAMPLES,
+                    )
+
             # Not enough samples yet to calculate
             if len(self._ring_ir) < config.MAX30102_MIN_SAMPLES:
-                logger.debug(
-                    "MAX30102 ring buffer filling: %d/%d samples",
-                    len(self._ring_ir), config.MAX30102_MIN_SAMPLES,
-                )
                 return {
                     "heart_rate_bpm": None, "spo2_percent": None,
                     "hr_valid": False,      "spo2_valid":  False,

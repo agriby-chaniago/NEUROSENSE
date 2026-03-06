@@ -28,9 +28,10 @@ MAX30102_I2C_ADDRESS = 0x57
 MAX30102_SAMPLE_BUFFER = 300
 MAX30102_SAMPLING_RATE_HZ = 100  # REG_SPO2_CONFIG=0x27 bits[4:2]=001 → SR=100 Hz
 # First HR/SpO2 result appears after MIN_SAMPLES are collected.
-# 100 samples @ 25 Hz = 4s — enough for 5+ cardiac cycles at 80 BPM.
-# After that, results update every _STEP_SIZE samples (~1s).
-MAX30102_MIN_SAMPLES = 100
+# 50 samples @ 25 Hz = 2s — enough for 2+ cardiac cycles at 80 BPM.
+# After that, results update every _STEP_SIZE samples (~0.4s at step=10).
+# On fresh finger placement, fast-fill kicks in to reach this within one step.
+MAX30102_MIN_SAMPLES = 50
 
 # ─── Grove GSR Sensor ─────────────────────────────────────────────────────
 # Wiring: Plug Grove cable into A0 port on Grove Base HAT
