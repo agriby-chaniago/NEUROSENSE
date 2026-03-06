@@ -224,6 +224,13 @@ class CameraReader:
         # exposure; it must compensate using analogue gain only.
         # Trade-off: consistent fps for all lighting vs. slightly more grain in
         # dim conditions — acceptable for temporal micro-expression datasets.
+        # Force the sensor into a matching raw readout mode.
+        # Root cause of 45fps lock: libcamera selects 1920x1080-SRGGB10/RAW as
+        # the sensor mode when no raw stream is requested, and OV64A40 at
+        # 1920x1080 physically caps at ~45fps (sensor row-timing limit).
+        # Adding an explicit raw stream at CAMERA_WIDTH x CAMERA_HEIGHT forces
+        # libcamera/PiSP to select a native 1280x720 sensor mode, which the
+        # OV64A40 can run at 60fps.
         video_cfg = cam.create_video_configuration(
             main={
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
@@ -233,14 +240,16 @@ class CameraReader:
                 "size":   (sw, sh),
                 "format": lores_fmt,
             },
+            raw={
+                "size": (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
+            },
             controls={
-                # Hard-lock ISP to exactly CAMERA_FRAMERATE fps.
                 "FrameDurationLimits": (frame_us, frame_us),
                 "AwbEnable": True,
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
             },
-            buffer_count=8,   # deeper ISP buffer = no stall at 60fps
+            buffer_count=8,
         )
 
         # Apply rotation if configured
