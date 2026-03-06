@@ -225,12 +225,8 @@ class CameraReader:
         # Trade-off: consistent fps for all lighting vs. slightly more grain in
         # dim conditions — acceptable for temporal micro-expression datasets.
         # Force the sensor into a matching raw readout mode.
-        # Root cause of 45fps lock: libcamera selects 1920x1080-SRGGB10/RAW as
-        # the sensor mode when no raw stream is requested, and OV64A40 at
-        # 1920x1080 physically caps at ~45fps (sensor row-timing limit).
-        # Adding an explicit raw stream at CAMERA_WIDTH x CAMERA_HEIGHT forces
-        # libcamera/PiSP to select a native 1280x720 sensor mode, which the
-        # OV64A40 can run at 60fps.
+        # OV64A40 only has one mode near high-fps: 1920x1080 @ 45.65fps max.
+        # FrameDurationLimits locks the ISP to exactly CAMERA_FRAMERATE (45fps).
         video_cfg = cam.create_video_configuration(
             main={
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
@@ -239,9 +235,6 @@ class CameraReader:
             lores={
                 "size":   (sw, sh),
                 "format": lores_fmt,
-            },
-            raw={
-                "size": (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
             },
             controls={
                 "FrameDurationLimits": (frame_us, frame_us),
@@ -269,21 +262,12 @@ class CameraReader:
 
         cam.configure(video_cfg)
 
-        # Log what libcamera accepted (non-blocking — just reads the dict object)
-        logger.info(
-            "CameraReader: configured controls: %s", video_cfg.get("controls", {})
-        )
-
         cam.start()
         self._cam = cam   # expose to capture_snapshot()
 
-        # ── Re-apply FrameDurationLimits post-start ───────────────────────
+        # Re-apply FrameDurationLimits post-start to ensure it sticks.
         try:
             cam.set_controls({"FrameDurationLimits": (frame_us, frame_us)})
-            logger.info(
-                "CameraReader: FrameDurationLimits set_controls(%d, %d) OK",
-                frame_us, frame_us,
-            )
         except Exception as fdl_exc:
             logger.warning("CameraReader: FrameDurationLimits post-start failed: %s", fdl_exc)
 
@@ -298,10 +282,6 @@ class CameraReader:
         # ── Dataset / fixed-exposure mode ─────────────────────────────────
         _fixed_exp  = getattr(config, "CAMERA_FIXED_EXPOSURE_US", 0)
         _fixed_gain = getattr(config, "CAMERA_ANALOGUE_GAIN", 0.0)
-        logger.info(
-            "CameraReader: CAMERA_FIXED_EXPOSURE_US=%d  CAMERA_ANALOGUE_GAIN=%s",
-            _fixed_exp, _fixed_gain,
-        )
         if _fixed_exp > 0:
             try:
                 _exp_controls = {"AeEnable": False, "ExposureTime": int(_fixed_exp)}
@@ -309,7 +289,7 @@ class CameraReader:
                     _exp_controls["AnalogueGain"] = float(_fixed_gain)
                 cam.set_controls(_exp_controls)
                 logger.info(
-                    "CameraReader: fixed exposure set — ExposureTime=%d µs, AnalogueGain=%s",
+                    "CameraReader: fixed exposure mode — ExposureTime=%d µs, AnalogueGain=%s",
                     int(_fixed_exp), _fixed_gain if _fixed_gain > 0 else "auto",
                 )
             except Exception as exp_exc:
@@ -405,22 +385,10 @@ class CameraReader:
             _cap_count  = 0
             _drop_count = 0
             _fps_t0     = time.monotonic()
-            _last_frame_t = time.monotonic()
 
             while self._running:
                 raw = cam.capture_array("lores")   # BGR888 from ISP
-                _now = time.monotonic()
-                _frame_interval_ms = (_now - _last_frame_t) * 1000
-                _last_frame_t = _now
                 _cap_count += 1
-
-                # Log actual inter-frame interval for first 5 frames + every 150
-                if _cap_count <= 5 or _cap_count % 150 == 0:
-                    logger.info(
-                        "CameraReader [frame %d]: inter-frame=%.1f ms (%.1f fps)",
-                        _cap_count, _frame_interval_ms,
-                        1000 / _frame_interval_ms if _frame_interval_ms > 0 else 0,
-                    )
 
                 # Non-blocking put: drop stale frame if encode can't keep up
                 try:
