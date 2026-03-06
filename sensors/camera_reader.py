@@ -236,10 +236,6 @@ class CameraReader:
             controls={
                 # Hard-lock ISP to exactly CAMERA_FRAMERATE fps.
                 "FrameDurationLimits": (frame_us, frame_us),
-                # Cap AE's maximum exposure time to one frame period.
-                # Without this, AE can request ExposureTime > frame_us which
-                # silently overrides FrameDurationLimits and drops fps to ~45.
-                "ExposureTimeRange": (1000, frame_us),
                 "AwbEnable": True,
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
@@ -273,6 +269,23 @@ class CameraReader:
         #   AfSpeed: 0=Normal, 1=Fast
         # Note: AfTrigger is NOT set — OV64A40 via PiSP rejects it before the
         # AF algorithm initialises; Continuous mode auto-starts scanning.
+        # Cap AE's maximum exposure time to one frame period so auto-exposure
+        # cannot silently extend the frame duration and drop fps below the target.
+        # ExposureTimeRange is not advertised by all libcamera/PiSP versions, so
+        # wrap in try/except — failure is non-fatal.
+        try:
+            cam.set_controls({"ExposureTimeRange": (100, frame_us)})
+            logger.info(
+                "CameraReader: ExposureTimeRange capped to (100, %d µs) to lock fps",
+                frame_us,
+            )
+        except Exception as etr_exc:
+            logger.warning(
+                "CameraReader: ExposureTimeRange not supported (%s) — "
+                "fps may drop below %d in low light",
+                etr_exc, config.CAMERA_FRAMERATE,
+            )
+
         if getattr(config, "CAMERA_AUTOFOCUS", False):
             try:
                 cam.set_controls({"AfMode": 2, "AfSpeed": 1})
