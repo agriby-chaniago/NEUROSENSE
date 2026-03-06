@@ -218,6 +218,12 @@ class CameraReader:
         # order (OV64A40 via PiSP sends BGR data in RGB888 containers).
         lores_fmt = "RGB888"
 
+        # FrameDurationLimits = (min_duration_us, max_duration_us).
+        # Setting both to frame_us LOCKS the ISP to exactly CAMERA_FRAMERATE fps.
+        # The AE algorithm can no longer slow the frame rate to gain extra
+        # exposure; it must compensate using analogue gain only.
+        # Trade-off: consistent fps for all lighting vs. slightly more grain in
+        # dim conditions — acceptable for temporal micro-expression datasets.
         video_cfg = cam.create_video_configuration(
             main={
                 "size":   (config.CAMERA_WIDTH, config.CAMERA_HEIGHT),
@@ -228,12 +234,12 @@ class CameraReader:
                 "format": lores_fmt,
             },
             controls={
-                "FrameDurationLimits": (frame_us, frame_us * 3),
+                "FrameDurationLimits": (frame_us, frame_us),   # hard-lock fps
                 "AwbEnable": True,
                 "AeEnable":  True,
                 "Sharpness": getattr(config, "CAMERA_SHARPNESS", 2.0),
             },
-            buffer_count=8,   # deeper ISP buffer = no stall at 30fps
+            buffer_count=8,   # deeper ISP buffer = no stall at 60fps
         )
 
         # Apply rotation if configured
