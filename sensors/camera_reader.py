@@ -260,40 +260,15 @@ class CameraReader:
 
         cam.configure(video_cfg)
 
-        # ── Debug: show what libcamera actually accepted ──────────────────
-        # PiSP sometimes silently adjusts controls; log the configured values
-        # so we can see if FrameDurationLimits is being overridden.
-        _cfg_controls = video_cfg.get("controls", {})
+        # Log what libcamera accepted (non-blocking — just reads the dict object)
         logger.info(
-            "CameraReader: configured controls before start: %s", _cfg_controls
+            "CameraReader: configured controls: %s", video_cfg.get("controls", {})
         )
 
         cam.start()
         self._cam = cam   # expose to capture_snapshot()
 
-        # Read back what libcamera actually applied after start.
-        try:
-            _meta = cam.capture_metadata()
-            _actual_fdl = _meta.get("FrameDuration")
-            _actual_exp = _meta.get("ExposureTime")
-            logger.info(
-                "CameraReader: actual metadata after start — "
-                "FrameDuration=%s µs (= %.1f fps)  ExposureTime=%s µs",
-                _actual_fdl,
-                1_000_000 / _actual_fdl if _actual_fdl else 0,
-                _actual_exp,
-            )
-        except Exception as meta_exc:
-            logger.warning("CameraReader: could not read startup metadata: %s", meta_exc)
-
-        # ── Autofocus (Arducam 64MP AF / OV64A40) ────────────────────────
-        # Must be called AFTER cam.start(). Integer constants used to avoid
-        # libcamera enum import issues on some Arducam driver versions.
-        #   AfMode: 0=Manual, 1=Auto(one-shot), 2=Continuous
-        #   AfSpeed: 0=Normal, 1=Fast
-        # Note: AfTrigger is NOT set — OV64A40 via PiSP rejects it before the
-        # AF algorithm initialises; Continuous mode auto-starts scanning.
-        # Re-apply FrameDurationLimits via set_controls() after start().
+        # ── Re-apply FrameDurationLimits post-start ───────────────────────
         try:
             cam.set_controls({"FrameDurationLimits": (frame_us, frame_us)})
             logger.info(
@@ -303,21 +278,21 @@ class CameraReader:
         except Exception as fdl_exc:
             logger.warning("CameraReader: FrameDurationLimits post-start failed: %s", fdl_exc)
 
+        # ── Autofocus (Arducam 64MP AF / OV64A40) ────────────────────────
         if getattr(config, "CAMERA_AUTOFOCUS", False):
             try:
                 cam.set_controls({"AfMode": 2, "AfSpeed": 1})
                 logger.info("CameraReader: continuous autofocus enabled (Arducam 64MP AF)")
             except Exception as af_exc:
-                logger.warning(
-                    "CameraReader: could not enable AF: %s", af_exc,
-                )
+                logger.warning("CameraReader: could not enable AF: %s", af_exc)
 
         # ── Dataset / fixed-exposure mode ─────────────────────────────────
-        # When CAMERA_FIXED_EXPOSURE_US > 0 the AE algorithm is disabled so
-        # luminance never flickers between frames, which would corrupt the
-        # temporal gradient features used by micro-expression models.
-        _fixed_exp = getattr(config, "CAMERA_FIXED_EXPOSURE_US", 0)
+        _fixed_exp  = getattr(config, "CAMERA_FIXED_EXPOSURE_US", 0)
         _fixed_gain = getattr(config, "CAMERA_ANALOGUE_GAIN", 0.0)
+        logger.info(
+            "CameraReader: CAMERA_FIXED_EXPOSURE_US=%d  CAMERA_ANALOGUE_GAIN=%s",
+            _fixed_exp, _fixed_gain,
+        )
         if _fixed_exp > 0:
             try:
                 _exp_controls = {"AeEnable": False, "ExposureTime": int(_fixed_exp)}
@@ -325,24 +300,13 @@ class CameraReader:
                     _exp_controls["AnalogueGain"] = float(_fixed_gain)
                 cam.set_controls(_exp_controls)
                 logger.info(
-                    "CameraReader: fixed exposure mode — ExposureTime=%d µs, AnalogueGain=%s",
+                    "CameraReader: fixed exposure set — ExposureTime=%d µs, AnalogueGain=%s",
                     int(_fixed_exp), _fixed_gain if _fixed_gain > 0 else "auto",
                 )
-                # Read back to confirm ExposureTime was actually accepted
-                try:
-                    _m2 = cam.capture_metadata()
-                    logger.info(
-                        "CameraReader: post-exposure metadata — "
-                        "FrameDuration=%s µs (%.1f fps)  ExposureTime=%s µs  Gain=%s",
-                        _m2.get("FrameDuration"),
-                        1_000_000 / _m2["FrameDuration"] if _m2.get("FrameDuration") else 0,
-                        _m2.get("ExposureTime"),
-                        _m2.get("AnalogueGain"),
-                    )
-                except Exception:
-                    pass
             except Exception as exp_exc:
                 logger.warning("CameraReader: could not set fixed exposure: %s", exp_exc)
+        else:
+            logger.info("CameraReader: AE enabled (CAMERA_FIXED_EXPOSURE_US=0) — fps may drift")
 
         self._backend = "picamera2"
         self._error = None
@@ -432,27 +396,22 @@ class CameraReader:
             _cap_count  = 0
             _drop_count = 0
             _fps_t0     = time.monotonic()
-            _frame_dur_sum = 0.0   # for averaging actual FrameDuration
+            _last_frame_t = time.monotonic()
 
             while self._running:
                 raw = cam.capture_array("lores")   # BGR888 from ISP
+                _now = time.monotonic()
+                _frame_interval_ms = (_now - _last_frame_t) * 1000
+                _last_frame_t = _now
                 _cap_count += 1
 
-                # Sample actual FrameDuration from metadata occasionally
+                # Log actual inter-frame interval for first 5 frames + every 150
                 if _cap_count <= 5 or _cap_count % 150 == 0:
-                    try:
-                        _fm = cam.capture_metadata()
-                        _fd = _fm.get("FrameDuration")
-                        _et = _fm.get("ExposureTime")
-                        logger.info(
-                            "CameraReader [frame %d]: FrameDuration=%s µs (%.1f fps)  "
-                            "ExposureTime=%s µs",
-                            _cap_count, _fd,
-                            1_000_000 / _fd if _fd else 0,
-                            _et,
-                        )
-                    except Exception:
-                        pass
+                    logger.info(
+                        "CameraReader [frame %d]: inter-frame=%.1f ms (%.1f fps)",
+                        _cap_count, _frame_interval_ms,
+                        1000 / _frame_interval_ms if _frame_interval_ms > 0 else 0,
+                    )
 
                 # Non-blocking put: drop stale frame if encode can't keep up
                 try:
