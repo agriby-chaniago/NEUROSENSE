@@ -48,11 +48,13 @@ class MAX30102Reader(BaseSensor):
         self._reject_count: int = 0
         self._EMA_MAX_REJECTS = 4   # clear after 4 consecutive bad reads (was 3)
         # SpO2 stability guard: require N consecutive reads with consistent HR
-        # before updating SpO2 EMA.  Prevents bad R values during buffer
-        # warm-up (settling data still in ring buffer after finger placement).
+        # before updating SpO2 EMA.  The motion-artifact guard (AC_RMS/DC < 15%)
+        # already rejects noisy buffers, so we only need 1 stable pair (= 2 reads
+        # within ±8 BPM) to confirm the signal is cardiac.  This lets SpO2 appear
+        # at the same time as HR instead of 2+ seconds later.
         self._prev_hr_bpm: float | None = None
         self._spo2_guard_count: int = 0
-        self._SPO2_MIN_STABLE = 3   # reads within ±8 BPM needed before SpO2 updates
+        self._SPO2_MIN_STABLE = 1   # 1 stable pair (2 consecutive reads within ±8 BPM)
         # IR drift guard: don't update SpO2 EMA while the DC level is shifting
         # (finger repositioning, placement, removal).  >3% change = transitional.
         self._prev_ir_mean: float | None = None
@@ -108,6 +110,30 @@ class MAX30102Reader(BaseSensor):
             self._ring_red.extend(red_step)
 
             import numpy as _np  # local import, lightweight
+
+            # ── Stale-buffer flush: sudden IR level jump ───────────────────
+            # When the finger was placed weakly (ir≈5000-8000) the buffer fills
+            # with low-quality samples.  Once the finger is properly pressed, the
+            # new step's IR can be 3-10× higher than the old buffer mean.
+            # autocorr sees a large DC ramp across the 12-second window →
+            # AC_RMS/DC stays >100% and the motion-artifact guard fires for the
+            # entire duration it takes all 300 old samples to age out (~12 s).
+            # Solution: if the NEW step mean is ≥3× the PRIOR buffer mean AND
+            # above the "finger present" threshold, the old data is stale.
+            # Flush and let fast-fill collect fresh samples immediately.
+            if len(self._ring_ir) > _STEP_SIZE:
+                _all_ir    = list(self._ring_ir)
+                _step_mean = float(_np.mean(_all_ir[-_STEP_SIZE:]))
+                _prior_mean = float(_np.mean(_all_ir[:-_STEP_SIZE]))
+                if _step_mean >= 8_000 and _step_mean > 3.0 * (_prior_mean + 1.0):
+                    logger.info(
+                        "MAX30102: IR level jumped (%.0f → %.0f) — flushing stale buffer",
+                        _prior_mean, _step_mean,
+                    )
+                    self._ring_ir.clear()
+                    self._ring_red.clear()
+                    self._ring_ir.extend(ir_step)
+                    self._ring_red.extend(red_step)
 
             # ── Fast-fill: finger just placed ─────────────────────────────
             # When the ring is nearly empty (≤ 2 × step = freshly cleared after
