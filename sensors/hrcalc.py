@@ -177,7 +177,10 @@ def calc_hr_and_spo2(
     #    forward-harmonic correction zone) to avoid double-correction.
     if best_lag > harmonic_min_lag:
         half_lag = best_lag // 2
-        if lag_min <= half_lag <= lag_max:
+        # Exclude half_lag == lag_min: the search boundary always has inflated
+        # autocorrelation due to edge effects — selecting it would yield a false
+        # 150 BPM reading when the true HR is ~75 BPM.
+        if lag_min < half_lag <= lag_max:
             half_corr = float(autocorr[half_lag])
             if half_corr >= 0.50 * best_corr and half_corr >= 0.10:
                 _log.info(
