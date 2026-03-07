@@ -43,6 +43,7 @@ logger = logging.getLogger(__name__)
 # Sensor fields recorded per row in session sensor_raw.csv
 SESSION_SENSOR_FIELDS = [
     "timestamp_ms",
+    "category",
     "heart_rate_bpm",
     "hr_valid",          # bool — False means value is stale/invalid; exclude from analysis
     "spo2_percent",
@@ -89,9 +90,16 @@ class SessionManager:
         self,
         respondent_id: str,
         duration_sec: int = None,
+        category: str = None,
     ) -> dict:
         """
         Start a new recording session.
+
+        Parameters
+        ----------
+        respondent_id : str
+        duration_sec  : int, optional
+        category      : str, optional  – one of 'normal', 'anxiety', 'stress', 'depression'
 
         Returns
         -------
@@ -124,6 +132,7 @@ class SessionManager:
         metadata = {
             "session_id":      session_id,
             "respondent_id":   respondent_id,
+            "category":        category,
             "duration_sec":    duration_sec,
             "started_at_utc":  started_at.isoformat(),
             "stopped_at_utc":  None,
@@ -147,7 +156,7 @@ class SessionManager:
         # Launch parallel recording threads
         t_sensor = threading.Thread(
             target=self._sensor_loop,
-            args=(session_dir, stop_event, metadata),
+            args=(session_dir, stop_event, metadata, category),
             name="session-sensor",
             daemon=True,
         )
@@ -261,6 +270,7 @@ class SessionManager:
         session_dir: Path,
         stop_event: threading.Event,
         metadata: dict,
+        category: str = None,
     ):
         """Record sensor readings to sensor_raw.csv at ~10 Hz.
 
@@ -285,6 +295,7 @@ class SessionManager:
                 data = self._sensor_manager.get_latest()
                 row  = {
                     "timestamp_ms":        int(time.time() * 1000),  # Unix epoch ms
+                    "category":            category,
                     "heart_rate_bpm":      data.get("heart_rate_bpm"),
                     "hr_valid":            data.get("hr_valid"),
                     "spo2_percent":        data.get("spo2_percent"),

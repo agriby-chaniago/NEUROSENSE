@@ -38,6 +38,7 @@ background: #fef3e2; color: #7a4800; } {% endblock %} {% block content %}
       <tr>
         <th>Session</th>
         <th>Respondent</th>
+        <th>Category</th>
         <th>Duration</th>
         <th>Frames</th>
         <th>Sensor Rows</th>
@@ -50,6 +51,16 @@ background: #fef3e2; color: #7a4800; } {% endblock %} {% block content %}
       <tr id="row-{{ s.session_id }}">
         <td><strong>{{ s.session_id }}</strong></td>
         <td>{{ s.respondent_id }}</td>
+        <td>
+          {% if s.category %}
+          <span
+            class="pill"
+            style="background: #eef2ff; color: #3730a3; font-size: 0.66rem"
+          >
+            {{ s.category | capitalize }}
+          </span>
+          {% else %}—{% endif %}
+        </td>
         <td>{{ s.duration_sec }}s</td>
         <td>{{ s.frame_count }}</td>
         <td>{{ s.sensor_rows }}</td>

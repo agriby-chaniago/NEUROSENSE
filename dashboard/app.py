@@ -303,6 +303,7 @@ def create_app(
             return jsonify({"status": "error", "message": "Module not ready"}), 503
         data         = request.get_json(silent=True) or request.form
         respondent   = data.get("respondent_id", "")
+        category     = data.get("category", "").strip().lower()
         duration_raw = data.get("duration_sec", None)
         try:
             duration = int(duration_raw) if duration_raw else None
@@ -312,8 +313,12 @@ def create_app(
         if not respondent:
             return jsonify({"status": "error",
                             "message": "respondent_id required"}), 400
+        valid_categories = {"normal", "anxiety", "stress", "depression"}
+        if category and category not in valid_categories:
+            return jsonify({"status": "error",
+                            "message": f"category must be one of {sorted(valid_categories)}"}), 400
         try:
-            meta = sm.start_session(respondent, duration_sec=duration)
+            meta = sm.start_session(respondent, duration_sec=duration, category=category or None)
             # If form POST (browser), redirect back to experiment page
             if request.form:
                 return redirect(url_for("experiment"))

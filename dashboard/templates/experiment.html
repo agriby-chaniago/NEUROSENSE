@@ -50,7 +50,8 @@ endblock %} {% block banners %}
   <div id="rec-info">
     <strong id="rec-title"
       >{% if active_session %}REC — {{ active_session.respondent_id }} ({{
-      active_session.session_id }}){% endif %}</strong
+      active_session.session_id }}){% if active_session.category %} · {{
+      active_session.category | upper }}{% endif %}{% endif %}</strong
     >
     <small id="rec-sub"
       >{% if active_session %}{{ active_session.elapsed_sec }}s / {{
@@ -107,6 +108,14 @@ endblock %} {% block banners %}
             {{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y
           </option>
           {% endfor %}
+        </select>
+        <label>Category</label>
+        <select name="category" required>
+          <option value="">— select category —</option>
+          <option value="normal">Normal</option>
+          <option value="anxiety">Anxiety</option>
+          <option value="stress">Stress</option>
+          <option value="depression">Depression</option>
         </select>
         <label>Duration (seconds)</label>
         <input
@@ -205,8 +214,9 @@ endblock %} {% block banners %}
           return;
         }
         banner.classList.add("show");
+        const cat = s.category ? ` · ${s.category.toUpperCase()}` : "";
         document.getElementById("rec-title").textContent =
-          `REC — ${s.respondent_id} (${s.session_id})`;
+          `REC — ${s.respondent_id} (${s.session_id})${cat}`;
         document.getElementById("rec-sub").textContent =
           `${s.elapsed_sec}s / ${s.duration_sec}s`;
         const pct = Math.min(
