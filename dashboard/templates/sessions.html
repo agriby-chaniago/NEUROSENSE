@@ -2,175 +2,68 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
     <title>NEUROSENSE — Sessions</title>
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       :root {
-        --bg: #f0f4f8;
-        --card-bg: #ffffff;
-        --border: #d0d9e4;
-        --text: #1a2b3c;
-        --muted: #52697e;
-        --accent: #1a5fad;
-        --green: #1e7845;
-        --red: #b71c1c;
-        --yellow: #c25d00;
-        --purple: #5e35b1;
-        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
+        --bg: #f0f4f8; --card-bg: #ffffff; --border: #d0d9e4;
+        --text: #1a2b3c; --muted: #52697e; --accent: #1a5fad;
+        --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
+        --purple: #5e35b1; --shadow: 0 1px 3px rgba(26,43,60,.1);
       }
+      html, body { width: 1024px; }
       body {
-        background: var(--bg);
-        color: var(--text);
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        padding: 1.5rem;
-        font-size: 0.92rem;
+        background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.82rem; padding: 0.5rem 0.75rem;
+        display: flex; flex-direction: column; gap: 0.5rem; min-height: 600px;
       }
+
       header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.85rem;
-        border-bottom: 2px solid var(--accent);
+        display: flex; align-items: center; gap: 0.75rem;
+        border-bottom: 2px solid var(--accent); padding-bottom: 0.45rem; flex-shrink: 0;
       }
-      header h1 {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: var(--accent);
-        letter-spacing: -0.02em;
-        margin-right: auto;
-      }
-      nav {
-        display: flex;
-        gap: 1.5rem;
-        align-items: center;
-      }
+      header h1 { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-right: auto; }
+      nav { display: flex; gap: 1rem; align-items: center; }
       nav a {
-        color: var(--muted);
-        text-decoration: none;
-        font-size: 0.85rem;
-        font-weight: 500;
-        padding: 0.2rem 0;
-        border-bottom: 2px solid transparent;
+        color: var(--muted); text-decoration: none; font-size: 0.78rem; font-weight: 500;
+        padding: .15rem 0; border-bottom: 2px solid transparent; white-space: nowrap;
       }
-      nav a:hover {
-        color: var(--accent);
-      }
-      nav a.active {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-        font-weight: 600;
-      }
+      nav a:hover { color: var(--accent); }
+      nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
       .card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        box-shadow: var(--shadow);
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 0.85rem 1rem; box-shadow: var(--shadow); flex: 1;
       }
       .card h2 {
-        font-size: 0.72rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.7rem; color: var(--muted);
+        text-transform: uppercase; letter-spacing: .08em;
       }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.85rem;
-      }
-      th {
-        text-align: left;
-        color: var(--muted);
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        padding: 0.5rem 0.75rem;
-        border-bottom: 2px solid var(--border);
-        background: #f8fafc;
-        white-space: nowrap;
-      }
-      td {
-        padding: 0.6rem 0.75rem;
-        border-bottom: 1px solid #eaeff5;
-        vertical-align: middle;
-      }
-      tr:last-child td {
-        border-bottom: none;
-      }
-      tr:hover td {
-        background: #f5f8fc;
-      }
-      .pill {
-        display: inline-block;
-        padding: 0.18rem 0.55rem;
-        border-radius: 10px;
-        font-size: 0.72rem;
-        font-weight: 700;
-      }
-      .pill-done {
-        background: #e6f4ed;
-        color: var(--green);
-      }
-      .pill-rec {
-        background: #fdecea;
-        color: var(--red);
-      }
-      .pill-interrupted {
-        background: #fef3e2;
-        color: #7a4800;
-      }
-      .pill-ok {
-        background: #e8f0fb;
-        color: var(--accent);
-      }
-      .pill-missing {
-        background: #f0f4f8;
-        color: var(--muted);
-      }
-      a.action {
-        color: var(--accent);
-        text-decoration: none;
-        font-size: 0.8rem;
-        font-weight: 500;
-      }
-      a.action:hover {
-        text-decoration: underline;
-      }
-      .stats {
-        display: flex;
-        gap: 1rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.25rem;
-      }
+
+      /* Stats row */
+      .stats { display: flex; gap: 0.75rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
       .stat {
-        background: #f0f4f8;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 0.6rem 1.1rem;
-        font-size: 0.8rem;
-        color: var(--muted);
-        min-width: 100px;
+        background: #f0f4f8; border: 1px solid var(--border); border-radius: 7px;
+        padding: 0.45rem 0.85rem; font-size: .72rem; color: var(--muted); min-width: 90px;
       }
-      .stat strong {
-        color: var(--text);
-        display: block;
-        font-size: 1.35rem;
-        font-weight: 700;
-        line-height: 1.2;
+      .stat strong { color: var(--text); display: block; font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
+
+      table { width: 100%; border-collapse: collapse; font-size: .8rem; }
+      th {
+        text-align: left; color: var(--muted); font-weight: 600; font-size: .68rem;
+        text-transform: uppercase; letter-spacing: .05em; padding: .38rem .65rem;
+        border-bottom: 2px solid var(--border); background: #f8fafc; white-space: nowrap;
       }
+      td { padding: .45rem .65rem; border-bottom: 1px solid #eaeff5; vertical-align: middle; }
+      tr:last-child td { border-bottom: none; }
+      tr:hover td { background: #f5f8fc; }
+
+      .pill { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .68rem; font-weight: 700; }
+      .pill-done        { background: #e6f4ed; color: var(--green); }
+      .pill-rec         { background: #fdecea; color: var(--red); }
+      .pill-interrupted { background: #fef3e2; color: #7a4800; }
     </style>
   </head>
   <body>
@@ -191,18 +84,10 @@
           <strong>{{ sessions|length }}</strong> Total Sessions
         </div>
         <div class="stat">
-          <strong
-            >{{ sessions|selectattr('status','equalto','done')|list|length
-            }}</strong
-          >
-          Completed
+          <strong>{{ sessions|selectattr('status','equalto','done')|list|length }}</strong> Completed
         </div>
         <div class="stat">
-          <strong
-            >{{ sessions|map(attribute='respondent_id')|unique|list|length
-            }}</strong
-          >
-          Respondents
+          <strong>{{ sessions|map(attribute='respondent_id')|unique|list|length }}</strong> Respondents
         </div>
       </div>
 
@@ -214,7 +99,7 @@
             <th>Respondent</th>
             <th>Duration</th>
             <th>Frames</th>
-            <th>Sensor rows</th>
+            <th>Sensor Rows</th>
             <th>Status</th>
           </tr>
         </thead>
@@ -227,9 +112,7 @@
             <td>{{ s.frame_count }}</td>
             <td>{{ s.sensor_rows }}</td>
             <td>
-              <span
-                class="pill {% if s.status=='done' %}pill-done{% elif s.status=='interrupted' %}pill-interrupted{% else %}pill-rec{% endif %}"
-              >
+              <span class="pill {% if s.status=='done' %}pill-done{% elif s.status=='interrupted' %}pill-interrupted{% else %}pill-rec{% endif %}">
                 {{ s.status }}
               </span>
             </td>
@@ -238,11 +121,9 @@
         </tbody>
       </table>
       {% else %}
-      <p style="color: var(--muted); font-size: 0.88rem; padding: 1rem 0">
+      <p style="color:var(--muted);font-size:.82rem;padding:.75rem 0">
         No sessions recorded yet.
-        <a href="/experiment" style="color: var(--accent); font-weight: 600"
-          >Start one →</a
-        >
+        <a href="/experiment" style="color:var(--accent);font-weight:600;">Start one →</a>
       </p>
       {% endif %}
     </div>

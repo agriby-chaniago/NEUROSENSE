@@ -2,178 +2,81 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
     <title>NEUROSENSE — Respondents</title>
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       :root {
-        --bg: #f0f4f8;
-        --card-bg: #ffffff;
-        --border: #d0d9e4;
-        --text: #1a2b3c;
-        --muted: #52697e;
-        --accent: #1a5fad;
-        --green: #1e7845;
-        --red: #b71c1c;
-        --yellow: #c25d00;
-        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
+        --bg: #f0f4f8; --card-bg: #ffffff; --border: #d0d9e4;
+        --text: #1a2b3c; --muted: #52697e; --accent: #1a5fad;
+        --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
+        --shadow: 0 1px 3px rgba(26,43,60,.1);
       }
+      html, body { width: 1024px; }
       body {
-        background: var(--bg);
-        color: var(--text);
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        padding: 1.5rem;
-        font-size: 0.92rem;
+        background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.82rem; padding: 0.5rem 0.75rem;
+        display: flex; flex-direction: column; gap: 0.5rem; min-height: 600px;
       }
+
       header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.85rem;
-        border-bottom: 2px solid var(--accent);
+        display: flex; align-items: center; gap: 0.75rem;
+        border-bottom: 2px solid var(--accent); padding-bottom: 0.45rem; flex-shrink: 0;
       }
-      header h1 {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: var(--accent);
-        letter-spacing: -0.02em;
-        margin-right: auto;
-      }
-      nav {
-        display: flex;
-        gap: 1.5rem;
-        align-items: center;
-      }
+      header h1 { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-right: auto; }
+      nav { display: flex; gap: 1rem; align-items: center; }
       nav a {
-        color: var(--muted);
-        text-decoration: none;
-        font-size: 0.85rem;
-        font-weight: 500;
-        padding: 0.2rem 0;
-        border-bottom: 2px solid transparent;
+        color: var(--muted); text-decoration: none; font-size: 0.78rem; font-weight: 500;
+        padding: .15rem 0; border-bottom: 2px solid transparent; white-space: nowrap;
       }
-      nav a:hover {
-        color: var(--accent);
-      }
-      nav a.active {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-        font-weight: 600;
-      }
+      nav a:hover { color: var(--accent); }
+      nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+      /* Two-column page layout */
+      .page-grid { display: grid; grid-template-columns: 340px 1fr; gap: 0.65rem; flex: 1; }
+
       .card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        box-shadow: var(--shadow);
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 0.85rem 1rem; box-shadow: var(--shadow);
       }
       .card h2 {
-        font-size: 0.72rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
+        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.7rem; color: var(--muted);
+        text-transform: uppercase; letter-spacing: .08em;
       }
-      label {
-        display: block;
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: var(--muted);
-        margin-bottom: 0.3rem;
+
+      label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: .22rem; }
+      input, select {
+        width: 100%; padding: 0.38rem 0.6rem; background: #f8fafc; border: 1px solid var(--border);
+        border-radius: 5px; color: var(--text); font-size: 0.82rem; margin-bottom: 0.55rem; transition: border-color .15s;
       }
-      input,
-      select {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        background: #f8fafc;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        color: var(--text);
-        font-size: 0.88rem;
-        margin-bottom: 0.75rem;
-        transition: border-color 0.15s;
+      input:focus, select:focus { outline: none; border-color: var(--accent); background: #fff; }
+
+      .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.55rem; }
+
+      button, .btn {
+        padding: .42rem .9rem; border: none; border-radius: 5px;
+        font-size: .82rem; font-weight: 600; cursor: pointer;
       }
-      input:focus,
-      select:focus {
-        outline: none;
-        border-color: var(--accent);
-        background: #fff;
-      }
-      .row {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-        gap: 0.75rem;
-      }
-      button,
-      .btn {
-        padding: 0.5rem 1.1rem;
-        border: none;
-        border-radius: 6px;
-        font-size: 0.88rem;
-        font-weight: 600;
-        cursor: pointer;
-      }
-      .btn-green {
-        background: var(--green);
-        color: #fff;
-      }
-      .btn-red {
-        background: var(--red);
-        color: #fff;
-        border: none;
-      }
-      .btn-muted {
-        background: #f0f4f8;
-        color: var(--text);
-        border: 1px solid var(--border);
-        text-decoration: none;
-      }
-      table {
-        width: 100%;
-        border-collapse: collapse;
-        font-size: 0.88rem;
-      }
-      th {
-        text-align: left;
-        color: var(--muted);
-        font-weight: 600;
-        font-size: 0.75rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
-        padding: 0.5rem 0.75rem;
-        border-bottom: 2px solid var(--border);
-        background: #f8fafc;
-      }
-      td {
-        padding: 0.6rem 0.75rem;
-        border-bottom: 1px solid #eaeff5;
-      }
-      tr:last-child td {
-        border-bottom: none;
-      }
-      tr:hover td {
-        background: #f5f8fc;
-      }
+      .btn-green { background: var(--green); color: #fff; }
+      .btn-red   { background: var(--red);   color: #fff; border: none; }
+      .btn-muted { background: #f0f4f8; color: var(--text); border: 1px solid var(--border); text-decoration: none; }
+
       .error {
-        color: var(--red);
-        font-size: 0.85rem;
-        margin-bottom: 0.75rem;
-        background: #fdecea;
-        border: 1px solid #e8a09a;
-        border-left: 3px solid var(--red);
-        border-radius: 6px;
-        padding: 0.5rem 0.75rem;
+        color: var(--red); font-size: .78rem; margin-bottom: .6rem;
+        background: #fdecea; border: 1px solid #e8a09a; border-left: 3px solid var(--red);
+        border-radius: 5px; padding: .4rem .65rem;
       }
+
+      table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+      th {
+        text-align: left; color: var(--muted); font-weight: 600; font-size: .68rem;
+        text-transform: uppercase; letter-spacing: .05em; padding: .4rem .65rem;
+        border-bottom: 2px solid var(--border); background: #f8fafc; white-space: nowrap;
+      }
+      td { padding: .45rem .65rem; border-bottom: 1px solid #eaeff5; }
+      tr:last-child td { border-bottom: none; }
+      tr:hover td { background: #f5f8fc; }
     </style>
   </head>
   <body>
@@ -187,100 +90,75 @@
       </nav>
     </header>
 
-    <!-- Register form -->
-    <div class="card">
-      <h2>Register Respondent</h2>
-      {% if error %}
-      <div class="error">{{ error }}</div>
-      {% endif %}
-      <form method="POST" action="/experiment/respondents/add">
-        <div class="row">
-          <div>
-            <label>ID (auto-filled if blank)</label>
-            <input
-              type="text"
-              name="respondent_id"
-              placeholder="{{ next_id }}"
-              pattern="R\d{3}"
-            />
+    <div class="page-grid">
+      <!-- Register form (left) -->
+      <div class="card">
+        <h2>Register Respondent</h2>
+        {% if error %}<div class="error">{{ error }}</div>{% endif %}
+        <form method="POST" action="/experiment/respondents/add">
+          <div class="form-row">
+            <div>
+              <label>ID (auto-filled if blank)</label>
+              <input type="text" name="respondent_id" placeholder="{{ next_id }}" pattern="R\d{3}" />
+            </div>
+            <div>
+              <label>Gender</label>
+              <select name="gender">
+                <option value="M">M — Male</option>
+                <option value="F">F — Female</option>
+              </select>
+            </div>
           </div>
-          <div>
-            <label>Gender</label>
-            <select name="gender">
-              <option value="M">M — Male</option>
-              <option value="F">F — Female</option>
-            </select>
+          <div class="form-row">
+            <div>
+              <label>Age</label>
+              <input type="number" name="age" placeholder="22" min="10" max="99" required />
+            </div>
+            <div>
+              <label>Notes (optional)</label>
+              <input type="text" name="notes" placeholder="e.g. left-handed" />
+            </div>
           </div>
-          <div>
-            <label>Age</label>
-            <input
-              type="number"
-              name="age"
-              placeholder="22"
-              min="10"
-              max="99"
-              required
-            />
-          </div>
-          <div>
-            <label>Notes (optional)</label>
-            <input
-              type="text"
-              name="notes"
-              placeholder="e.g. left-handed, glasses"
-            />
-          </div>
-        </div>
-        <button class="btn-green" type="submit">+ Register</button>
-      </form>
-    </div>
+          <button class="btn-green" type="submit">+ Register</button>
+        </form>
+      </div>
 
-    <!-- Respondent list -->
-    <div class="card">
-      <h2>Registered Respondents ({{ respondents|length }})</h2>
-      {% if respondents %}
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Gender</th>
-            <th>Age</th>
-            <th>Notes</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in respondents %}
-          <tr>
-            <td><strong>{{ r.respondent_id }}</strong></td>
-            <td>{{ r.gender }}</td>
-            <td>{{ r.age }}</td>
-            <td style="color: var(--muted)">{{ r.notes or '—' }}</td>
-            <td>
-              <button
-                class="btn-red"
-                onclick="deletResp('{{ r.respondent_id }}', this)"
-              >
-                Delete
-              </button>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p style="color: var(--muted); font-size: 0.88rem">
-        No respondents registered yet.
-      </p>
-      {% endif %}
+      <!-- Respondent list (right) -->
+      <div class="card">
+        <h2>Registered Respondents ({{ respondents|length }})</h2>
+        {% if respondents %}
+        <table>
+          <thead>
+            <tr>
+              <th>ID</th><th>Gender</th><th>Age</th><th>Notes</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in respondents %}
+            <tr>
+              <td><strong>{{ r.respondent_id }}</strong></td>
+              <td>{{ r.gender }}</td>
+              <td>{{ r.age }}</td>
+              <td style="color:var(--muted)">{{ r.notes or '—' }}</td>
+              <td>
+                <button class="btn-red" onclick="deletResp('{{ r.respondent_id }}', this)">Delete</button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        {% else %}
+        <p style="color:var(--muted);font-size:.82rem">No respondents registered yet.</p>
+        {% endif %}
+      </div>
     </div>
 
     <script>
       function deletResp(id, btn) {
         if (!confirm("Delete " + id + "?")) return;
         fetch("/experiment/respondents/" + id, { method: "DELETE" })
-          .then((r) => r.json())
-          .then((d) => {
+          .then(r => r.json())
+          .then(d => {
             if (d.status === "ok") btn.closest("tr").remove();
             else alert("Error: " + d.status);
           });

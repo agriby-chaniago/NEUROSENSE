@@ -2,274 +2,110 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
     <title>NEUROSENSE — Experiment Control</title>
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
       :root {
-        --bg: #f0f4f8;
-        --card-bg: #ffffff;
-        --border: #d0d9e4;
-        --text: #1a2b3c;
-        --muted: #52697e;
-        --accent: #1a5fad;
-        --green: #1e7845;
-        --red: #b71c1c;
-        --yellow: #c25d00;
-        --purple: #5e35b1;
-        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
+        --bg: #f0f4f8; --card-bg: #ffffff; --border: #d0d9e4;
+        --text: #1a2b3c; --muted: #52697e; --accent: #1a5fad;
+        --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
+        --purple: #5e35b1; --shadow: 0 1px 3px rgba(26,43,60,.1);
       }
+      html, body { width: 1024px; }
       body {
-        background: var(--bg);
-        color: var(--text);
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        padding: 1.5rem;
-        font-size: 0.92rem;
-      }
-      header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        padding-bottom: 0.85rem;
-        border-bottom: 2px solid var(--accent);
-      }
-      header h1 {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: var(--accent);
-        letter-spacing: -0.02em;
-        margin-right: auto;
-      }
-      nav {
-        display: flex;
-        gap: 1.5rem;
-        align-items: center;
-      }
-      nav a {
-        color: var(--muted);
-        text-decoration: none;
-        font-size: 0.85rem;
-        font-weight: 500;
-        padding: 0.2rem 0;
-        border-bottom: 2px solid transparent;
-      }
-      nav a:hover {
-        color: var(--accent);
-      }
-      nav a.active {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-        font-weight: 600;
-      }
-      .card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        padding: 1.25rem;
-        margin-bottom: 1rem;
-        box-shadow: var(--shadow);
-      }
-      .card h2 {
-        font-size: 0.72rem;
-        font-weight: 700;
-        margin-bottom: 1rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.08em;
-      }
-      label {
-        display: block;
-        font-size: 0.78rem;
-        font-weight: 600;
-        color: var(--muted);
-        margin-bottom: 0.3rem;
-      }
-      select,
-      input {
-        width: 100%;
-        padding: 0.5rem 0.75rem;
-        background: #f8fafc;
-        border: 1px solid var(--border);
-        border-radius: 6px;
-        color: var(--text);
-        font-size: 0.88rem;
-        margin-bottom: 0.75rem;
-        transition: border-color 0.15s;
-      }
-      select:focus,
-      input:focus {
-        outline: none;
-        border-color: var(--accent);
-        background: #fff;
-      }
-      .row {
-        display: flex;
-        gap: 0.75rem;
-      }
-      .row > * {
-        flex: 1;
-      }
-      button,
-      .btn {
-        padding: 0.55rem 1.25rem;
-        border: none;
-        border-radius: 6px;
-        font-size: 0.88rem;
-        font-weight: 600;
-        cursor: pointer;
-        letter-spacing: 0.01em;
-      }
-      .btn-green {
-        background: var(--green);
-        color: #fff;
-      }
-      .btn-red {
-        background: var(--red);
-        color: #fff;
-      }
-      .btn-accent {
-        background: var(--accent);
-        color: #fff;
-      }
-      .btn-muted {
-        background: #f0f4f8;
-        color: var(--text);
-        border: 1px solid var(--border);
-        text-decoration: none;
-      }
-      .btn-muted:hover {
-        background: #e4eaf1;
-      }
-      button:disabled {
-        opacity: 0.4;
-        cursor: not-allowed;
-      }
-      .pill {
-        display: inline-block;
-        padding: 0.18rem 0.55rem;
-        border-radius: 10px;
-        font-size: 0.72rem;
-        font-weight: 700;
-      }
-      .pill-green {
-        background: #e6f4ed;
-        color: var(--green);
-      }
-      .pill-red {
-        background: #fdecea;
-        color: var(--red);
-      }
-      .pill-yellow {
-        background: #fef3e2;
-        color: var(--yellow);
-      }
-      /* Recording status banner */
-      #rec-banner {
-        display: none;
-        align-items: center;
-        gap: 0.75rem;
-        background: #fdecea;
-        border: 1px solid #e8a09a;
-        border-left: 4px solid var(--red);
-        border-radius: 8px;
-        padding: 1rem 1.25rem;
-        margin-bottom: 1rem;
-      }
-      #rec-banner.show {
-        display: flex;
-      }
-      #rec-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: var(--red);
-        animation: blink 1s ease-in-out infinite;
-        flex-shrink: 0;
-      }
-      @keyframes blink {
-        50% {
-          opacity: 0;
-        }
-      }
-      #rec-info {
-        flex: 1;
-      }
-      #rec-info strong {
-        font-size: 0.95rem;
-        color: var(--red);
-      }
-      #rec-info small {
-        color: var(--muted);
-        font-size: 0.78rem;
-        display: block;
-        margin-top: 0.15rem;
-      }
-      #rec-bar-wrap {
-        width: 100%;
-        height: 5px;
-        background: #f0d0cf;
-        border-radius: 3px;
-        margin-top: 0.5rem;
-      }
-      #rec-bar {
-        width: 0%;
-        height: 5px;
-        background: var(--red);
-        border-radius: 3px;
-        transition: width 0.5s;
-      }
-      .grid2 {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 1rem;
-      }
-      @media (max-width: 640px) {
-        .grid2 {
-          grid-template-columns: 1fr;
-        }
+        background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.82rem; padding: 0.5rem 0.75rem; min-height: 600px;
+        display: flex; flex-direction: column; gap: 0.5rem;
       }
 
-      /* ── Countdown overlay ────────────────────────────── */
+      /* Header */
+      header {
+        display: flex; align-items: center; gap: 0.75rem;
+        border-bottom: 2px solid var(--accent); padding-bottom: 0.45rem; flex-shrink: 0;
+      }
+      header h1 { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-right: auto; }
+      nav { display: flex; gap: 1rem; align-items: center; }
+      nav a {
+        color: var(--muted); text-decoration: none; font-size: 0.78rem; font-weight: 500;
+        padding: 0.15rem 0; border-bottom: 2px solid transparent; white-space: nowrap;
+      }
+      nav a:hover { color: var(--accent); }
+      nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+      /* Recording banner */
+      #rec-banner {
+        display: none; align-items: center; gap: 0.6rem;
+        background: #fdecea; border: 1px solid #e8a09a; border-left: 4px solid var(--red);
+        border-radius: 7px; padding: 0.6rem 0.85rem; flex-shrink: 0;
+      }
+      #rec-banner.show { display: flex; }
+      #rec-dot {
+        width: 9px; height: 9px; border-radius: 50%; background: var(--red);
+        animation: blink 1s ease-in-out infinite; flex-shrink: 0;
+      }
+      @keyframes blink { 50% { opacity: 0; } }
+      #rec-info { flex: 1; }
+      #rec-info strong { font-size: 0.88rem; color: var(--red); }
+      #rec-info small { color: var(--muted); font-size: 0.72rem; display: block; margin-top: 0.1rem; }
+      #rec-bar-wrap { width: 100%; height: 4px; background: #f0d0cf; border-radius: 2px; margin-top: 0.4rem; }
+      #rec-bar { width: 0%; height: 4px; background: var(--red); border-radius: 2px; transition: width .5s; }
+
+      /* Main 2-column layout */
+      .main-grid {
+        display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; flex: 1;
+      }
+
+      /* Cards */
+      .card {
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 0.85rem 1rem; box-shadow: var(--shadow);
+      }
+      .card h2 {
+        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--muted);
+        text-transform: uppercase; letter-spacing: .08em;
+      }
+      label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 0.25rem; }
+      select, input {
+        width: 100%; padding: 0.4rem 0.65rem; background: #f8fafc; border: 1px solid var(--border);
+        border-radius: 5px; color: var(--text); font-size: 0.82rem; margin-bottom: 0.6rem; transition: border-color .15s;
+      }
+      select:focus, input:focus { outline: none; border-color: var(--accent); background: #fff; }
+      button, .btn {
+        padding: 0.45rem 1rem; border: none; border-radius: 5px;
+        font-size: 0.82rem; font-weight: 600; cursor: pointer; letter-spacing: .01em;
+      }
+      .btn-green { background: var(--green); color: #fff; }
+      .btn-red   { background: var(--red);   color: #fff; }
+      .btn-accent { background: var(--accent); color: #fff; }
+      .btn-muted { background: #f0f4f8; color: var(--text); border: 1px solid var(--border); text-decoration: none; }
+      .btn-muted:hover { background: #e4eaf1; }
+      button:disabled { opacity: .4; cursor: not-allowed; }
+
+      .pill { display: inline-block; padding: .16rem .5rem; border-radius: 10px; font-size: .7rem; font-weight: 700; }
+      .pill-green  { background: #e6f4ed; color: var(--green); }
+      .pill-red    { background: #fdecea; color: var(--red); }
+      .pill-yellow { background: #fef3e2; color: var(--yellow); }
+
+      /* Camera in right card */
+      .cam-card { display: flex; flex-direction: column; }
+      .cam-card .cam-wrap { flex: 1; min-height: 0; position: relative; background: #0d1520; border-radius: 5px; border: 1px solid var(--border); overflow: hidden; }
+      .cam-card img { width: 100%; height: 100%; object-fit: contain; display: block; }
+
+      /* Quick links */
+      .links-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+
+      /* Countdown overlay */
       #countdown-overlay {
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: rgba(10, 22, 40, 0.82);
-        z-index: 1000;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 0.75rem;
+        display: none; position: fixed; inset: 0;
+        background: rgba(10,22,40,.82); z-index: 1000;
+        flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem;
       }
-      #countdown-overlay.show {
-        display: flex;
-      }
-      #countdown-number {
-        font-size: 8rem;
-        font-weight: 800;
-        color: #fff;
-        line-height: 1;
-        transition: transform 0.15s ease, opacity 0.15s ease;
-      }
-      #countdown-number.pop {
-        transform: scale(1.25);
-        opacity: 0.7;
-      }
-      #countdown-label {
-        font-size: 1rem;
-        font-weight: 600;
-        color: rgba(255,255,255,0.65);
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-      }
+      #countdown-overlay.show { display: flex; }
+      #countdown-number { font-size: 7rem; font-weight: 800; color: #fff; line-height: 1; transition: transform .15s ease, opacity .15s ease; }
+      #countdown-number.pop { transform: scale(1.25); opacity: .7; }
+      #countdown-label { font-size: 0.95rem; font-weight: 600; color: rgba(255,255,255,.65); letter-spacing: .1em; text-transform: uppercase; }
     </style>
   </head>
   <body>
@@ -289,38 +125,29 @@
       </nav>
     </header>
 
-    <!-- Recording banner (visible when a session is active) -->
+    <!-- Recording banner -->
     <div id="rec-banner" {% if active_session %}class="show" {% endif %}>
       <div id="rec-dot"></div>
       <div id="rec-info">
         <strong id="rec-title">
-          {% if active_session %} REC — {{ active_session.respondent_id }} ({{
-          active_session.session_id }}) {% endif %}
+          {% if active_session %}REC — {{ active_session.respondent_id }} ({{ active_session.session_id }}){% endif %}
         </strong>
         <small id="rec-sub">
-          {% if active_session %} {{ active_session.elapsed_sec }}s / {{
-          active_session.duration_sec }}s {% endif %}
+          {% if active_session %}{{ active_session.elapsed_sec }}s / {{ active_session.duration_sec }}s{% endif %}
         </small>
         <div id="rec-bar-wrap">
-          <div
-            id="rec-bar"
-            {%
-            if
-            active_session
-            %}
-            style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"
-            {%
-            endif
-            %}
+          <div id="rec-bar"
+            {% if active_session %}style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"{% endif %}
           ></div>
         </div>
       </div>
-      <form method="POST" action="/experiment/session/stop" style="margin: 0">
+      <form method="POST" action="/experiment/session/stop" style="margin:0">
         <button class="btn-red" type="submit">Stop</button>
       </form>
     </div>
 
-    <div class="grid2">
+    <!-- Main grid: form + camera -->
+    <div class="main-grid">
       <!-- Start Session -->
       <div class="card">
         <h2>Start New Session</h2>
@@ -329,176 +156,85 @@
           <select name="respondent_id" required>
             <option value="">— select —</option>
             {% for r in respondents %}
-            <option value="{{ r.respondent_id }}">
-              {{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y
-            </option>
+            <option value="{{ r.respondent_id }}">{{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y</option>
             {% endfor %}
           </select>
-
           <label>Duration (seconds)</label>
-          <input
-            type="number"
-            name="duration_sec"
-            value="{{ default_duration }}"
-            min="5"
-            max="600"
-          />
-
-          <button
-            class="btn-green"
-            type="submit"
-            {%
-            if
-            active_session
-            %}disabled
-            title="Stop current session first"
-            {%
-            endif
-            %}
-          >
+          <input type="number" name="duration_sec" value="{{ default_duration }}" min="5" max="600" />
+          <button class="btn-green" type="submit"
+            {% if active_session %}disabled title="Stop current session first"{% endif %}>
             ▶ Start Recording
           </button>
         </form>
         {% if not respondents %}
-        <p
-          style="
-            color: var(--yellow);
-            font-size: 0.82rem;
-            margin-top: 0.75rem;
-            background: #fef3e2;
-            padding: 0.5rem 0.75rem;
-            border-radius: 5px;
-            border-left: 3px solid var(--yellow);
-          "
-        >
-          ⚠ No respondents registered yet.
-          <a
-            href="/experiment/respondents"
-            style="color: var(--accent); font-weight: 600"
-            >Add one →</a
-          >
+        <p style="color:var(--yellow);font-size:.78rem;margin-top:.65rem;background:#fef3e2;padding:.45rem .65rem;border-radius:5px;border-left:3px solid var(--yellow);">
+          ⚠ No respondents yet.
+          <a href="/experiment/respondents" style="color:var(--accent);font-weight:600;">Add one →</a>
         </p>
         {% endif %}
       </div>
 
-      <!-- Live camera preview -->
-      <div class="card">
+      <!-- Live camera -->
+      <div class="card cam-card">
         <h2>Live Camera</h2>
-        <img
-          src="/camera/stream"
-          alt="camera stream"
-          style="
-            width: 100%;
-            border-radius: 6px;
-            background: #e8ecf0;
-            border: 1px solid var(--border);
-          "
-          onerror="
-            this.style.display = 'none';
-            document.getElementById('cam-err').style.display = 'block';
-          "
-        />
-        <p
-          id="cam-err"
-          style="
-            display: none;
-            color: var(--muted);
-            font-size: 0.82rem;
-            margin-top: 0.5rem;
-          "
-        >
-          Camera not available.
-        </p>
+        <div class="cam-wrap">
+          <img src="/camera/stream" alt="camera stream"
+            onerror="this.closest('.cam-wrap').style.background='#e8ecf0'; document.getElementById('cam-err').style.display='block';" />
+        </div>
+        <p id="cam-err" style="display:none;color:var(--muted);font-size:.78rem;margin-top:.4rem;">Camera not available.</p>
       </div>
     </div>
 
-    <!-- Recent sessions shortcut -->
+    <!-- Quick links -->
     <div class="card">
-      <h2>Quick links</h2>
-      <div style="display: flex; gap: 0.75rem; flex-wrap: wrap">
-        <a
-          href="/experiment/respondents"
-          class="btn btn-muted"
-          style="text-decoration: none"
-          >👥 Manage Respondents</a
-        >
-        <a
-          href="/experiment/sessions"
-          class="btn btn-muted"
-          style="text-decoration: none"
-          >📋 All Sessions</a
-        >
-        <a href="/" class="btn btn-muted" style="text-decoration: none"
-          >📊 Sensor Dashboard</a
-        >
+      <h2>Quick Links</h2>
+      <div class="links-row">
+        <a href="/experiment/respondents" class="btn btn-muted" style="text-decoration:none;">👥 Manage Respondents</a>
+        <a href="/experiment/sessions"   class="btn btn-muted" style="text-decoration:none;">📋 All Sessions</a>
+        <a href="/"                       class="btn btn-muted" style="text-decoration:none;">📊 Sensor Dashboard</a>
       </div>
     </div>
 
     <script>
-      // ── Countdown before start ────────────────────────────────────────────
       const startForm = document.querySelector("form[action='/experiment/session/start']");
       if (startForm) {
-        startForm.addEventListener("submit", function (e) {
+        startForm.addEventListener("submit", function(e) {
           e.preventDefault();
-          const overlay  = document.getElementById("countdown-overlay");
-          const numEl    = document.getElementById("countdown-number");
-          const labelEl  = document.getElementById("countdown-label");
+          const overlay = document.getElementById("countdown-overlay");
+          const numEl   = document.getElementById("countdown-number");
+          const labelEl = document.getElementById("countdown-label");
           overlay.classList.add("show");
-
           const steps = [
             { n: "3", label: "Get ready…" },
             { n: "2", label: "Stay still…" },
             { n: "1", label: "Almost…" },
             { n: "REC", label: "Recording started!" },
           ];
-
-          function pop(el) {
-            el.classList.remove("pop");
-            void el.offsetWidth;  // reflow to restart transition
-            el.classList.add("pop");
-          }
-
+          function pop(el) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
           let i = 0;
           function tick() {
             if (i < steps.length) {
-              numEl.textContent   = steps[i].n;
+              numEl.textContent = steps[i].n;
               labelEl.textContent = steps[i].label;
-              pop(numEl);
-              i++;
-              if (i < steps.length) {
-                setTimeout(tick, 1000);
-              } else {
-                // Last step shown (REC!) — submit after short delay
-                setTimeout(() => startForm.submit(), 500);
-              }
+              pop(numEl); i++;
+              if (i < steps.length) setTimeout(tick, 1000);
+              else setTimeout(() => startForm.submit(), 500);
             }
           }
           tick();
         });
       }
 
-      // ── Poll active session and update banner every second ────────────
       function pollActive() {
-        fetch("/experiment/session/active")
-          .then((r) => r.json())
-          .then((s) => {
-            const banner = document.getElementById("rec-banner");
-            if (!s) {
-              banner.classList.remove("show");
-              return;
-            }
-            banner.classList.add("show");
-            document.getElementById("rec-title").textContent =
-              `REC — ${s.respondent_id} (${s.session_id})`;
-            document.getElementById("rec-sub").textContent =
-              `${s.elapsed_sec}s / ${s.duration_sec}s`;
-            const pct = Math.min(
-              100,
-              Math.round((s.elapsed_sec / s.duration_sec) * 100),
-            );
-            document.getElementById("rec-bar").style.width = pct + "%";
-          })
-          .catch(() => {});
+        fetch("/experiment/session/active").then(r => r.json()).then(s => {
+          const banner = document.getElementById("rec-banner");
+          if (!s) { banner.classList.remove("show"); return; }
+          banner.classList.add("show");
+          document.getElementById("rec-title").textContent = `REC — ${s.respondent_id} (${s.session_id})`;
+          document.getElementById("rec-sub").textContent   = `${s.elapsed_sec}s / ${s.duration_sec}s`;
+          const pct = Math.min(100, Math.round(s.elapsed_sec / s.duration_sec * 100));
+          document.getElementById("rec-bar").style.width = pct + "%";
+        }).catch(() => {});
       }
       setInterval(pollActive, 1000);
     </script>

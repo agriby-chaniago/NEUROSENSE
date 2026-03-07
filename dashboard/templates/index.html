@@ -2,340 +2,150 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=1024, initial-scale=1.0" />
     <title>NEUROSENSE Dashboard</title>
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
     <style>
-      *,
-      *::before,
-      *::after {
-        box-sizing: border-box;
-        margin: 0;
-        padding: 0;
-      }
+      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
       :root {
-        --bg: #f0f4f8;
-        --card-bg: #ffffff;
-        --border: #d0d9e4;
-        --text: #1a2b3c;
-        --muted: #52697e;
-        --accent: #1a5fad;
-        --green: #1e7845;
-        --red: #b71c1c;
-        --yellow: #c25d00;
-        --purple: #5e35b1;
-        --shadow: 0 1px 4px rgba(26, 43, 60, 0.08);
+        --bg: #f0f4f8; --card-bg: #ffffff; --border: #d0d9e4;
+        --text: #1a2b3c; --muted: #52697e; --accent: #1a5fad;
+        --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
+        --purple: #5e35b1; --shadow: 0 1px 3px rgba(26,43,60,.1);
       }
+
+      html, body { width: 1024px; height: 600px; overflow: hidden; }
 
       body {
-        background: var(--bg);
-        color: var(--text);
-        font-family:
-          -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        padding: 1.5rem;
-        font-size: 0.92rem;
+        background: var(--bg); color: var(--text);
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+        font-size: 0.82rem;
+        display: flex; flex-direction: column;
+        padding: 0.5rem 0.75rem; gap: 0.5rem;
       }
 
+      /* Header */
       header {
-        display: flex;
-        align-items: center;
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-        border-bottom: 2px solid var(--accent);
-        padding-bottom: 0.85rem;
+        display: flex; align-items: center; gap: 0.75rem;
+        border-bottom: 2px solid var(--accent); padding-bottom: 0.45rem;
+        flex-shrink: 0;
       }
       header h1 {
-        font-size: 1.25rem;
-        font-weight: 700;
-        color: var(--accent);
-        letter-spacing: -0.02em;
+        font-size: 1rem; font-weight: 700; color: var(--accent);
+        letter-spacing: -0.02em; white-space: nowrap;
       }
-      #last-update {
-        font-size: 0.72rem;
-        color: var(--muted);
-        white-space: nowrap;
-        margin-right: auto;
-      }
-
+      #last-update { font-size: 0.68rem; color: var(--muted); white-space: nowrap; margin-right: auto; }
       #status-dot {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: var(--muted);
-        flex-shrink: 0;
-        transition: background 0.4s;
-        border: 2px solid rgba(26, 43, 60, 0.12);
+        width: 9px; height: 9px; border-radius: 50%; background: var(--muted);
+        flex-shrink: 0; transition: background .4s; border: 2px solid rgba(26,43,60,.12);
       }
-      #status-dot.live {
-        background: var(--green);
-        border-color: rgba(30, 120, 69, 0.3);
+      #status-dot.live  { background: var(--green); border-color: rgba(30,120,69,.3); }
+      #status-dot.error { background: var(--red); }
+      header nav { display: flex; gap: 1rem; align-items: center; }
+      header nav a {
+        color: var(--muted); text-decoration: none; font-size: 0.78rem;
+        font-weight: 500; padding: 0.15rem 0; border-bottom: 2px solid transparent; white-space: nowrap;
       }
-      #status-dot.error {
-        background: var(--red);
+      header nav a:hover { color: var(--accent); }
+      header nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
+
+      /* Banners */
+      #alert-banner, #disk-warning {
+        display: none; border-radius: 5px; padding: 0.4rem 0.75rem;
+        font-size: 0.78rem; font-weight: 600; align-items: center; gap: 0.5rem; flex-shrink: 0;
+      }
+      #alert-banner.visible { display: flex; }
+      #disk-warning.visible { display: flex; }
+      #alert-banner { background: #fdecea; border: 1px solid #e8a09a; border-left: 4px solid var(--red); color: var(--red); }
+      #disk-warning { background: #fef3e2; border: 1px solid #f5c97a; border-left: 4px solid var(--yellow); color: #7a4800; }
+
+      /* Main 2-column layout */
+      .main-layout {
+        display: grid; grid-template-columns: 390px 1fr; gap: 0.6rem;
+        flex: 1; min-height: 0;
       }
 
-      /* ── Alert banner ─────────────────────────────────── */
-      #alert-banner {
-        display: none;
-        background: #fdecea;
-        border: 1px solid #e8a09a;
-        border-left: 4px solid var(--red);
-        border-radius: 6px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 1.25rem;
-        color: var(--red);
-        font-size: 0.88rem;
-        font-weight: 600;
-        align-items: center;
-        gap: 0.6rem;
-      }
-      #alert-banner.visible {
-        display: flex;
-      }
-      /* ── Disk warning banner ──────────────────────────── */
-      #disk-warning {
-        display: none;
-        background: #fef3e2;
-        border: 1px solid #f5c97a;
-        border-left: 4px solid var(--yellow);
-        border-radius: 6px;
-        padding: 0.75rem 1rem;
-        margin-bottom: 1.25rem;
-        color: #7a4800;
-        font-size: 0.88rem;
-        font-weight: 600;
-        align-items: center;
-        gap: 0.6rem;
-      }
-      #disk-warning.visible {
-        display: flex;
-      }
-
-      /* ── Sensor stale overlay on metric cards ───────────────── */
-      .metric-card.stale .value {
-        color: var(--muted) !important;
-        opacity: 0.5;
-      }
-      .metric-card.stale::after {
-        content: 'NO SIGNAL';
-        display: block;
-        font-size: 0.6rem;
-        font-weight: 700;
-        letter-spacing: 0.08em;
-        color: var(--muted);
-        margin-top: 0.2rem;
-      }
-      /* ── Big metric cards ─────────────────────────────── */
-      .metrics-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-        gap: 1rem;
-        margin-bottom: 1.5rem;
-      }
-      .metric-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 1rem;
-        text-align: center;
-        box-shadow: var(--shadow);
-      }
-      .metric-card .label {
-        font-size: 0.7rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.06em;
-        font-weight: 600;
-      }
-      .metric-card .value {
-        font-size: 2rem;
-        font-weight: 700;
-        line-height: 1.2;
-        margin: 0.3rem 0;
-      }
-      .metric-card .unit {
-        font-size: 0.75rem;
-        color: var(--muted);
-      }
-      .metric-card.hr .value {
-        color: #b71c1c;
-      }
-      .metric-card.spo2 .value {
-        color: #1a5fad;
-      }
-      .metric-card.temp .value {
-        color: #c25d00;
-      }
-      .metric-card.hum .value {
-        color: #1e7845;
-      }
-      .metric-card.ads .value {
-        color: #00796b;
-      }
-      .metric-card.pres .value {
-        color: #5e35b1;
-      }
-      .metric-card.gsr .value {
-        color: #0277bd;
-      }
-
-      /* ── Recalibrate button ───────────────────────────── */
-      .btn-recal {
-        margin-top: 0.55rem;
-        padding: 0.28rem 0.7rem;
-        font-size: 0.7rem;
-        font-weight: 600;
-        letter-spacing: 0.03em;
-        cursor: pointer;
-        border: 1px solid var(--border);
-        border-radius: 5px;
-        background: #eef3fb;
-        color: var(--accent);
-        transition:
-          background 0.15s,
-          border-color 0.15s;
-      }
-      .btn-recal:hover:not(:disabled) {
-        background: #dde9f8;
-        border-color: var(--accent);
-      }
-      .btn-recal:disabled {
-        opacity: 0.45;
-        cursor: not-allowed;
-      }
-      #recal-status {
-        font-size: 0.68rem;
-        margin-top: 0.3rem;
-        color: var(--muted);
-        min-height: 1rem;
-      }
-      #recal-status.ok {
-        color: var(--green);
-      }
-      #recal-status.err {
-        color: var(--red);
-      }
-      #recal-status.busy {
-        color: var(--yellow);
-      }
-
-      .invalid {
-        opacity: 0.4;
-      }
-
-      /* ── Charts ───────────────────────────────────────── */
-      .charts-grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fill, minmax(420px, 1fr));
-        gap: 1.25rem;
-      }
-      .chart-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 1rem 1.25rem 1.25rem;
-        box-shadow: var(--shadow);
-      }
-      .chart-card h3 {
-        font-size: 0.75rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
-      }
-      .chart-card canvas {
-        width: 100% !important;
-      }
-
-      footer {
-        margin-top: 2rem;
-        text-align: center;
-        font-size: 0.72rem;
-        color: var(--muted);
-        padding-top: 1rem;
-        border-top: 1px solid var(--border);
-      }
-
-      /* ── Camera feed ───────────────────────────────── */
+      /* Left: Camera */
+      .left-col { display: flex; flex-direction: column; min-height: 0; }
       .camera-card {
-        background: var(--card-bg);
-        border: 1px solid var(--border);
-        border-radius: 10px;
-        padding: 1rem 1.25rem 1.25rem;
-        margin-bottom: 1.5rem;
-        box-shadow: var(--shadow);
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 0.55rem 0.7rem 0.5rem; box-shadow: var(--shadow);
+        display: flex; flex-direction: column; flex: 1; min-height: 0;
       }
       .camera-card h3 {
-        font-size: 0.75rem;
-        color: var(--muted);
-        text-transform: uppercase;
-        letter-spacing: 0.07em;
-        font-weight: 600;
-        margin-bottom: 0.75rem;
+        font-size: 0.68rem; color: var(--muted); text-transform: uppercase;
+        letter-spacing: 0.07em; font-weight: 600; margin-bottom: 0.4rem; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: space-between;
       }
-      .camera-card .camera-inner {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        gap: 0.6rem;
-      }
+      #camera-status { font-size: 0.65rem; color: var(--muted); font-weight: 400; text-transform: none; letter-spacing: 0; }
+      #camera-status.error { color: var(--red); }
       .camera-wrap {
-        position: relative;
-        width: 100%;
-        max-width: 640px;
+        position: relative; flex: 1; min-height: 0;
+        background: #0d1520; border-radius: 5px; border: 1px solid var(--border); overflow: hidden;
       }
-      #camera-feed {
-        width: 100%;
-        border-radius: 6px;
-        border: 1px solid var(--border);
-        background: #e8ecf0;
-        display: block;
-      }
+      #camera-feed { width: 100%; height: 100%; object-fit: contain; display: block; }
       #camera-fps {
-        position: absolute;
-        bottom: 8px;
-        right: 8px;
-        background: rgba(0, 0, 0, 0.52);
-        color: #fff;
-        font-size: 0.7rem;
-        font-weight: 700;
-        padding: 2px 8px;
-        border-radius: 4px;
-        letter-spacing: 0.05em;
-        pointer-events: none;
-        font-family: monospace;
-      }
-      #camera-status {
-        font-size: 0.72rem;
-        color: var(--muted);
-      }
-      #camera-status.error {
-        color: var(--red);
+        position: absolute; bottom: 6px; right: 6px;
+        background: rgba(0,0,0,.55); color: #fff; font-size: 0.65rem; font-weight: 700;
+        padding: 2px 7px; border-radius: 4px; letter-spacing: .04em;
+        pointer-events: none; font-family: monospace;
       }
 
-      /* ── Nav links in header ──────────────────────────── */
-      header nav {
-        display: flex;
-        gap: 1.5rem;
-        align-items: center;
+      /* Right: Info */
+      .right-col { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
+
+      /* Metric mini-cards 3x2 */
+      .metrics-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45rem; flex-shrink: 0; }
+      .metric-card {
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 7px;
+        padding: 0.45rem 0.4rem 0.35rem; text-align: center; box-shadow: var(--shadow); position: relative;
       }
-      header nav a {
-        color: var(--muted);
-        text-decoration: none;
-        font-size: 0.85rem;
-        font-weight: 500;
-        padding: 0.2rem 0;
-        border-bottom: 2px solid transparent;
+      .metric-card .label { font-size: 0.62rem; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; font-weight: 600; }
+      .metric-card .value { font-size: 1.5rem; font-weight: 700; line-height: 1.15; margin: 0.1rem 0; }
+      .metric-card .unit  { font-size: 0.62rem; color: var(--muted); }
+      .metric-card.hr   .value { color: #b71c1c; }
+      .metric-card.spo2 .value { color: #1a5fad; }
+      .metric-card.temp .value { color: #c25d00; }
+      .metric-card.hum  .value { color: #1e7845; }
+      .metric-card.pres .value { color: #5e35b1; }
+      .metric-card.gsr  .value { color: #0277bd; }
+      .metric-card.stale .value { color: var(--muted) !important; opacity: .45; }
+      .metric-card.stale::after { content: 'NO SIGNAL'; display: block; font-size: .55rem; font-weight: 700; letter-spacing: .08em; color: var(--muted); }
+      .invalid { opacity: 0.35; }
+
+      .btn-recal {
+        margin-top: 0.25rem; padding: 0.18rem 0.45rem; font-size: 0.6rem; font-weight: 600;
+        cursor: pointer; border: 1px solid var(--border); border-radius: 4px;
+        background: #eef3fb; color: var(--accent); transition: background .15s, border-color .15s;
       }
-      header nav a:hover {
-        color: var(--accent);
+      .btn-recal:hover:not(:disabled) { background: #dde9f8; border-color: var(--accent); }
+      .btn-recal:disabled { opacity: .45; cursor: not-allowed; }
+      #recal-status { font-size: .6rem; margin-top: .15rem; color: var(--muted); min-height: .85rem; line-height: 1.1; }
+      #recal-status.ok   { color: var(--green); }
+      #recal-status.err  { color: var(--red); }
+      #recal-status.busy { color: var(--yellow); }
+
+      /* Charts 2x2 */
+      .charts-grid {
+        display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr;
+        gap: 0.45rem; flex: 1; min-height: 0;
       }
-      header nav a.active {
-        color: var(--accent);
-        border-bottom-color: var(--accent);
-        font-weight: 600;
+      .chart-card {
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 7px;
+        padding: 0.45rem 0.55rem 0.45rem; box-shadow: var(--shadow);
+        display: flex; flex-direction: column; min-height: 0;
+      }
+      .chart-card h3 {
+        font-size: 0.6rem; color: var(--muted); text-transform: uppercase;
+        letter-spacing: .06em; font-weight: 600; margin-bottom: .25rem; flex-shrink: 0;
+      }
+      .chart-card canvas { flex: 1; min-height: 0; width: 100% !important; }
+
+      /* Footer */
+      footer {
+        text-align: center; font-size: 0.62rem; color: var(--muted);
+        padding-top: 0.3rem; border-top: 1px solid var(--border); flex-shrink: 0;
       }
     </style>
   </head>
@@ -352,87 +162,86 @@
       </nav>
     </header>
 
-    <!-- ── Alert banner ───────────────────────────────────── -->
     <div id="alert-banner">
-      <span style="font-size: 1.1rem">&#9888;</span>
+      <span>&#9888;</span>
       <span id="alert-text"></span>
     </div>
-    <!-- ── Disk warning banner ───────────────────────────────── -->
     <div id="disk-warning">
-      <span style="font-size: 1.1rem">&#128190;</span>
+      <span>&#128190;</span>
       <span id="disk-warning-text"></span>
     </div>
-    <!-- ── Big metric cards ─────────────────────────────── -->
-    <div class="metrics-grid">
-      <div class="metric-card hr">
-        <div class="label">Heart Rate</div>
-        <div class="value" id="val-hr">—</div>
-        <div class="unit">BPM</div>
-      </div>
-      <div class="metric-card spo2">
-        <div class="label">SpO₂</div>
-        <div class="value" id="val-spo2">—</div>
-        <div class="unit">%</div>
-      </div>
-      <div class="metric-card temp">
-        <div class="label">Temperature</div>
-        <div class="value" id="val-temp">—</div>
-        <div class="unit">°C</div>
-      </div>
-      <div class="metric-card hum">
-        <div class="label">Humidity</div>
-        <div class="value" id="val-hum">—</div>
-        <div class="unit">% RH</div>
-      </div>
-      <div class="metric-card pres">
-        <div class="label">Pressure</div>
-        <div class="value" id="val-pres">—</div>
-        <div class="unit">hPa</div>
-      </div>
-      <div class="metric-card gsr">
-        <div class="label">GSR / EDA</div>
-        <div class="value" id="val-gsr">—</div>
-        <div class="unit">µS</div>
-        <button class="btn-recal" id="btn-recal" onclick="recalibrateGSR()">
-          ⟳ Recalibrate
-        </button>
-        <div id="recal-status"></div>
-      </div>
-    </div>
-    <!-- ── Camera feed ───────────────────────────────────── -->
-    <div class="camera-card" id="camera-section">
-      <h3>&#127909; Arducam Live Feed</h3>
-      <div class="camera-inner">
-        <div class="camera-wrap">
-          <img
-            id="camera-feed"
-            src="/camera/stream"
-            alt="Camera stream"
-            onerror="onCameraError()"
-            onload="onCameraLoad()"
-          />
-          <span id="camera-fps">— fps</span>
+
+    <div class="main-layout">
+      <!-- LEFT: Camera -->
+      <div class="left-col">
+        <div class="camera-card" id="camera-section">
+          <h3>
+            &#127909; Arducam Live Feed
+            <span id="camera-status">Connecting…</span>
+          </h3>
+          <div class="camera-wrap">
+            <img id="camera-feed" src="/camera/stream" alt="Camera stream"
+              onerror="onCameraError()" onload="onCameraLoad()" />
+            <span id="camera-fps">— fps</span>
+          </div>
         </div>
-        <div id="camera-status">Connecting…</div>
       </div>
-    </div>
-    <!-- ── Charts ───────────────────────────────────────── -->
-    <div class="charts-grid">
-      <div class="chart-card">
-        <h3>Heart Rate &amp; SpO₂ (last 60 s)</h3>
-        <canvas id="chart-hr" height="130"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>Temperature &amp; Humidity (last 60 s)</h3>
-        <canvas id="chart-env" height="130"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>Atmospheric Pressure (last 60 s)</h3>
-        <canvas id="chart-pres" height="130"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>GSR Skin Conductance / EDA (last 60 s)</h3>
-        <canvas id="chart-gsr" height="130"></canvas>
+
+      <!-- RIGHT: Metrics + Charts -->
+      <div class="right-col">
+        <div class="metrics-grid">
+          <div class="metric-card hr">
+            <div class="label">Heart Rate</div>
+            <div class="value" id="val-hr">—</div>
+            <div class="unit">BPM</div>
+          </div>
+          <div class="metric-card spo2">
+            <div class="label">SpO₂</div>
+            <div class="value" id="val-spo2">—</div>
+            <div class="unit">%</div>
+          </div>
+          <div class="metric-card temp">
+            <div class="label">Temperature</div>
+            <div class="value" id="val-temp">—</div>
+            <div class="unit">°C</div>
+          </div>
+          <div class="metric-card hum">
+            <div class="label">Humidity</div>
+            <div class="value" id="val-hum">—</div>
+            <div class="unit">% RH</div>
+          </div>
+          <div class="metric-card pres">
+            <div class="label">Pressure</div>
+            <div class="value" id="val-pres">—</div>
+            <div class="unit">hPa</div>
+          </div>
+          <div class="metric-card gsr">
+            <div class="label">GSR / EDA</div>
+            <div class="value" id="val-gsr">—</div>
+            <div class="unit">µS</div>
+            <button class="btn-recal" id="btn-recal" onclick="recalibrateGSR()">⟳ Recal</button>
+            <div id="recal-status"></div>
+          </div>
+        </div>
+
+        <div class="charts-grid">
+          <div class="chart-card">
+            <h3>Heart Rate &amp; SpO₂ (60 s)</h3>
+            <canvas id="chart-hr"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Temperature &amp; Humidity (60 s)</h3>
+            <canvas id="chart-env"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>Atmospheric Pressure (60 s)</h3>
+            <canvas id="chart-pres"></canvas>
+          </div>
+          <div class="chart-card">
+            <h3>GSR Conductance / EDA (60 s)</h3>
+            <canvas id="chart-gsr"></canvas>
+          </div>
+        </div>
       </div>
     </div>
 

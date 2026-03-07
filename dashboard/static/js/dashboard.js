@@ -19,9 +19,10 @@ Chart.defaults.font.size = 11;
 const CHART_OPTIONS = (yLabel, suggestedMin, suggestedMax) => ({
   animation: false,
   responsive: true,
+  maintainAspectRatio: false,
   interaction: { mode: "index", intersect: false },
   plugins: {
-    legend: { labels: { boxWidth: 12, padding: 14 } },
+    legend: { labels: { boxWidth: 10, padding: 10, font: { size: 10 } } },
     tooltip: {
       backgroundColor: "#ffffff",
       titleColor: "#1a2b3c",
@@ -31,10 +32,14 @@ const CHART_OPTIONS = (yLabel, suggestedMin, suggestedMax) => ({
     },
   },
   scales: {
-    x: { grid: { color: "#e8edf3" }, ticks: { maxTicksLimit: 8 } },
+    x: {
+      grid: { color: "#e8edf3" },
+      ticks: { maxTicksLimit: 6, font: { size: 9 } },
+    },
     y: {
       grid: { color: "#e8edf3" },
-      title: { display: !!yLabel, text: yLabel },
+      title: { display: !!yLabel, text: yLabel, font: { size: 9 } },
+      ticks: { font: { size: 9 } },
       suggestedMin,
       suggestedMax,
     },
