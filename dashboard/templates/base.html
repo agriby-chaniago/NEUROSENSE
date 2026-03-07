@@ -104,49 +104,23 @@
       <h1>NEUROSENSE</h1>
       {% block header_after_h1 %}{% endblock %}
       <nav>
-        <a href="/" {% if request.path="" ="/" %}class="active" {% endif %}
-          >Dashboard</a
-        >
-        <a
-          href="/experiment"
-          {%
-          if
-          request.path=""
-          ="/experiment"
-          %}class="active"
-          {%
-          endif
-          %}
-          >Experiment</a
-        >
-        <a
-          href="/experiment/respondents"
-          {%
-          if
-          request.path=""
-          ="/experiment/respondents"
-          %}class="active"
-          {%
-          endif
-          %}
-          >Respondents</a
-        >
-        <a
-          href="/experiment/sessions"
-          {%
-          if
-          request.path=""
-          ="/experiment/sessions"
-          %}class="active"
-          {%
-          endif
-          %}
-          >Sessions</a
-        >
+        <a href="/">Dashboard</a>
+        <a href="/experiment">Experiment</a>
+        <a href="/experiment/respondents">Respondents</a>
+        <a href="/experiment/sessions">Sessions</a>
       </nav>
     </header>
 
     {% block banners %}{% endblock %} {% block content %}{% endblock %} {% block
     footer %}{% endblock %} {% block scripts %}{% endblock %}
+
+    <script>
+      (function () {
+        var p = window.location.pathname;
+        document.querySelectorAll("nav a").forEach(function (a) {
+          if (a.getAttribute("href") === p) a.classList.add("active");
+        });
+      })();
+    </script>
   </body>
 </html>
