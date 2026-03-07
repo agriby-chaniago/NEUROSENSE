@@ -1,269 +1,222 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1024, initial-scale=1.0" />
-    <title>NEUROSENSE — Experiment Control</title>
-    <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      :root {
-        --bg: #f0f4f8; --card-bg: #ffffff; --border: #d0d9e4;
-        --text: #1a2b3c; --muted: #52697e; --accent: #1a5fad;
-        --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
-        --purple: #5e35b1; --shadow: 0 1px 3px rgba(26,43,60,.1);
-      }
+{% extends "base.html" %} {% block title %}NEUROSENSE — Experiment Control{%
+endblock %} {% block extra_style %} /* Experiment — locked to 1024×600 */ html,
+body { height: 600px; overflow: hidden; } /* Recording banner */ #rec-banner {
+display: none; align-items: center; gap: 0.6rem; background: #fdecea; border:
+1px solid #e8a09a; border-left: 4px solid var(--red); border-radius: 7px;
+padding: 0.5rem 0.85rem; flex-shrink: 0; } #rec-banner.show { display: flex; }
+#rec-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--red);
+animation: blink 1s ease-in-out infinite; flex-shrink: 0; } @keyframes blink {
+50% { opacity: 0; } } #rec-info { flex: 1; } #rec-info strong { font-size:
+0.85rem; color: var(--red); } #rec-info small { color: var(--muted); font-size:
+0.7rem; display: block; margin-top: 0.1rem; } #rec-bar-wrap { width: 100%;
+height: 4px; background: #f0d0cf; border-radius: 2px; margin-top: 0.3rem; }
+#rec-bar { width: 0%; height: 4px; background: var(--red); border-radius: 2px;
+transition: width .5s; } /* Main 2-column layout */ .main-layout { display:
+grid; grid-template-columns: 390px 1fr; gap: 0.6rem; flex: 1; min-height: 0; }
+/* Left: Camera */ .left-col { display: flex; flex-direction: column;
+min-height: 0; } .camera-card { background: var(--card-bg); border: 1px solid
+var(--border); border-radius: 8px; padding: 0.55rem 0.7rem 0.5rem; box-shadow:
+var(--shadow); display: flex; flex-direction: column; flex: 1; min-height: 0; }
+.camera-card h3 { font-size: 0.68rem; color: var(--muted); text-transform:
+uppercase; letter-spacing: 0.07em; font-weight: 600; margin-bottom: 0.4rem;
+flex-shrink: 0; } .camera-wrap { position: relative; flex: 1; min-height: 0;
+border-radius: 5px; border: 1px solid var(--border); overflow: hidden; }
+.camera-wrap img { width: 100%; height: 100%; object-fit: cover; display: block;
+} #cam-err { display: none; color: var(--muted); font-size: .78rem; padding:
+.5rem; } /* Right: Controls */ .right-col { display: flex; flex-direction:
+column; gap: 0.5rem; min-height: 0; } /* Cards — slightly tighter padding than
+base */ .card { padding: 0.75rem 0.9rem; } .card h2 { margin-bottom: 0.65rem; }
+.links-row { display: flex; gap: 0.5rem; flex-wrap: wrap; } .warn-box { color:
+var(--yellow); font-size: .75rem; margin-top: .5rem; background: #fef3e2;
+padding: .4rem .6rem; border-radius: 5px; border-left: 3px solid var(--yellow);
+} /* Countdown overlay */ #countdown-overlay { display: none; position: fixed;
+inset: 0; background: rgba(10,22,40,.82); z-index: 1000; flex-direction: column;
+align-items: center; justify-content: center; gap: 0.6rem; }
+#countdown-overlay.show { display: flex; } #countdown-number { font-size: 7rem;
+font-weight: 800; color: #fff; line-height: 1; transition: transform .15s ease,
+opacity .15s ease; } #countdown-number.pop { transform: scale(1.25); opacity:
+.7; } #countdown-label { font-size: 0.95rem; font-weight: 600; color:
+rgba(255,255,255,.65); letter-spacing: .1em; text-transform: uppercase; } {%
+endblock %} {% block banners %}
+<!-- Countdown overlay -->
+<div id="countdown-overlay">
+  <div id="countdown-number">3</div>
+  <div id="countdown-label">Get ready…</div>
+</div>
 
-      html, body { width: 1024px; height: 600px; overflow: hidden; }
-
-      body {
-        background: var(--bg); color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 0.82rem; padding: 0.5rem 0.75rem;
-        display: flex; flex-direction: column; gap: 0.5rem;
-      }
-
-      /* Header */
-      header {
-        display: flex; align-items: center; gap: 0.75rem;
-        border-bottom: 2px solid var(--accent); padding-bottom: 0.45rem; flex-shrink: 0;
-      }
-      header h1 { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-right: auto; }
-      nav { display: flex; gap: 1rem; align-items: center; }
-      nav a {
-        color: var(--muted); text-decoration: none; font-size: 0.78rem; font-weight: 500;
-        padding: 0.15rem 0; border-bottom: 2px solid transparent; white-space: nowrap;
-      }
-      nav a:hover { color: var(--accent); }
-      nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-
-      /* Recording banner */
-      #rec-banner {
-        display: none; align-items: center; gap: 0.6rem;
-        background: #fdecea; border: 1px solid #e8a09a; border-left: 4px solid var(--red);
-        border-radius: 7px; padding: 0.5rem 0.85rem; flex-shrink: 0;
-      }
-      #rec-banner.show { display: flex; }
-      #rec-dot {
-        width: 9px; height: 9px; border-radius: 50%; background: var(--red);
-        animation: blink 1s ease-in-out infinite; flex-shrink: 0;
-      }
-      @keyframes blink { 50% { opacity: 0; } }
-      #rec-info { flex: 1; }
-      #rec-info strong { font-size: 0.85rem; color: var(--red); }
-      #rec-info small { color: var(--muted); font-size: 0.7rem; display: block; margin-top: 0.1rem; }
-      #rec-bar-wrap { width: 100%; height: 4px; background: #f0d0cf; border-radius: 2px; margin-top: 0.3rem; }
-      #rec-bar { width: 0%; height: 4px; background: var(--red); border-radius: 2px; transition: width .5s; }
-
-      /* Main 2-column layout: camera left, controls right */
-      .main-layout {
-        display: grid; grid-template-columns: 390px 1fr; gap: 0.6rem;
-        flex: 1; min-height: 0;
-      }
-
-      /* Left: Camera */
-      .left-col { display: flex; flex-direction: column; min-height: 0; }
-      .camera-card {
-        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
-        padding: 0.55rem 0.7rem 0.5rem; box-shadow: var(--shadow);
-        display: flex; flex-direction: column; flex: 1; min-height: 0;
-      }
-      .camera-card h3 {
-        font-size: 0.68rem; color: var(--muted); text-transform: uppercase;
-        letter-spacing: 0.07em; font-weight: 600; margin-bottom: 0.4rem; flex-shrink: 0;
-      }
-      .camera-wrap {
-        position: relative; flex: 1; min-height: 0;
-        border-radius: 5px; border: 1px solid var(--border); overflow: hidden;
-      }
-      .camera-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
-      #cam-err { display: none; color: var(--muted); font-size: .78rem; padding: .5rem; }
-
-      /* Right: Controls */
-      .right-col { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
-
-      /* Cards */
-      .card {
-        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
-        padding: 0.75rem 0.9rem; box-shadow: var(--shadow);
-      }
-      .card h2 {
-        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.65rem; color: var(--muted);
-        text-transform: uppercase; letter-spacing: .08em;
-      }
-
-      label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 0.22rem; }
-      select, input {
-        width: 100%; padding: 0.38rem 0.6rem; background: #f8fafc; border: 1px solid var(--border);
-        border-radius: 5px; color: var(--text); font-size: 0.82rem; margin-bottom: 0.5rem; transition: border-color .15s;
-      }
-      select:focus, input:focus { outline: none; border-color: var(--accent); background: #fff; }
-
-      button, .btn {
-        padding: 0.42rem 0.95rem; border: none; border-radius: 5px;
-        font-size: 0.82rem; font-weight: 600; cursor: pointer; letter-spacing: .01em;
-      }
-      .btn-green { background: var(--green); color: #fff; }
-      .btn-red   { background: var(--red);   color: #fff; }
-      .btn-muted {
-        background: #f0f4f8; color: var(--text); border: 1px solid var(--border);
-        text-decoration: none; display: inline-block; text-align: center;
-      }
-      .btn-muted:hover { background: #e4eaf1; }
-      button:disabled { opacity: .4; cursor: not-allowed; }
-
-      /* Links row */
-      .links-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-
-      /* No respondents warning */
-      .warn-box {
-        color: var(--yellow); font-size: .75rem; margin-top: .5rem;
-        background: #fef3e2; padding: .4rem .6rem; border-radius: 5px; border-left: 3px solid var(--yellow);
-      }
-
-      /* Countdown overlay */
-      #countdown-overlay {
-        display: none; position: fixed; inset: 0;
-        background: rgba(10,22,40,.82); z-index: 1000;
-        flex-direction: column; align-items: center; justify-content: center; gap: 0.6rem;
-      }
-      #countdown-overlay.show { display: flex; }
-      #countdown-number { font-size: 7rem; font-weight: 800; color: #fff; line-height: 1; transition: transform .15s ease, opacity .15s ease; }
-      #countdown-number.pop { transform: scale(1.25); opacity: .7; }
-      #countdown-label { font-size: 0.95rem; font-weight: 600; color: rgba(255,255,255,.65); letter-spacing: .1em; text-transform: uppercase; }
-    </style>
-  </head>
-  <body>
-    <!-- Countdown overlay -->
-    <div id="countdown-overlay">
-      <div id="countdown-number">3</div>
-      <div id="countdown-label">Get ready…</div>
+<!-- Recording banner -->
+<div id="rec-banner" {% if active_session %}class="show" {% endif %}>
+  <div id="rec-dot"></div>
+  <div id="rec-info">
+    <strong id="rec-title"
+      >{% if active_session %}REC — {{ active_session.respondent_id }} ({{
+      active_session.session_id }}){% endif %}</strong
+    >
+    <small id="rec-sub"
+      >{% if active_session %}{{ active_session.elapsed_sec }}s / {{
+      active_session.duration_sec }}s{% endif %}</small
+    >
+    <div id="rec-bar-wrap">
+      <div
+        id="rec-bar"
+        {%
+        if
+        active_session
+        %}style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"
+        {%
+        endif
+        %}
+      ></div>
     </div>
-
-    <!-- Header -->
-    <header>
-      <h1>NEUROSENSE</h1>
-      <nav>
-        <a href="/">Dashboard</a>
-        <a href="/experiment" class="active">Experiment</a>
-        <a href="/experiment/respondents">Respondents</a>
-        <a href="/experiment/sessions">Sessions</a>
-      </nav>
-    </header>
-
-    <!-- Recording banner -->
-    <div id="rec-banner" {% if active_session %}class="show" {% endif %}>
-      <div id="rec-dot"></div>
-      <div id="rec-info">
-        <strong id="rec-title">{% if active_session %}REC — {{ active_session.respondent_id }} ({{ active_session.session_id }}){% endif %}</strong>
-        <small id="rec-sub">{% if active_session %}{{ active_session.elapsed_sec }}s / {{ active_session.duration_sec }}s{% endif %}</small>
-        <div id="rec-bar-wrap">
-          <div id="rec-bar" {% if active_session %}style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"{% endif %}></div>
-        </div>
+  </div>
+  <form method="POST" action="/experiment/session/stop" style="margin: 0">
+    <button class="btn-red" type="submit">■ Stop</button>
+  </form>
+</div>
+{% endblock %} {% block content %}
+<div class="main-layout">
+  <!-- LEFT: Camera -->
+  <div class="left-col">
+    <div class="camera-card">
+      <h3>&#127909; Live Camera</h3>
+      <div class="camera-wrap">
+        <img
+          src="/camera/stream"
+          alt="camera stream"
+          onerror="
+            document.getElementById('cam-err').style.display = 'block';
+            this.style.display = 'none';
+          "
+        />
+        <p id="cam-err">Camera not available.</p>
       </div>
-      <form method="POST" action="/experiment/session/stop" style="margin:0">
-        <button class="btn-red" type="submit">■ Stop</button>
+    </div>
+  </div>
+
+  <!-- RIGHT: Controls -->
+  <div class="right-col">
+    <!-- Start Session -->
+    <div class="card">
+      <h2>Start New Session</h2>
+      <form method="POST" action="/experiment/session/start">
+        <label>Respondent</label>
+        <select name="respondent_id" required>
+          <option value="">— select —</option>
+          {% for r in respondents %}
+          <option value="{{ r.respondent_id }}">
+            {{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y
+          </option>
+          {% endfor %}
+        </select>
+        <label>Duration (seconds)</label>
+        <input
+          type="number"
+          name="duration_sec"
+          value="{{ default_duration }}"
+          min="5"
+          max="600"
+        />
+        <button
+          class="btn-green"
+          type="submit"
+          {%
+          if
+          active_session
+          %}disabled
+          title="Stop current session first"
+          {%
+          endif
+          %}
+        >
+          ▶ Start Recording
+        </button>
       </form>
+      {% if not respondents %}
+      <div class="warn-box">
+        ⚠ No respondents yet.
+        <a
+          href="/experiment/respondents"
+          style="color: var(--accent); font-weight: 600"
+          >Add one →</a
+        >
+      </div>
+      {% endif %}
     </div>
 
-    <!-- Main layout -->
-    <div class="main-layout">
-
-      <!-- LEFT: Camera -->
-      <div class="left-col">
-        <div class="camera-card">
-          <h3>&#127909; Live Camera</h3>
-          <div class="camera-wrap">
-            <img src="/camera/stream" alt="camera stream"
-              onerror="document.getElementById('cam-err').style.display='block'; this.style.display='none';" />
-            <p id="cam-err">Camera not available.</p>
-          </div>
-        </div>
-      </div>
-
-      <!-- RIGHT: Controls -->
-      <div class="right-col">
-
-        <!-- Start Session -->
-        <div class="card">
-          <h2>Start New Session</h2>
-          <form method="POST" action="/experiment/session/start">
-            <label>Respondent</label>
-            <select name="respondent_id" required>
-              <option value="">— select —</option>
-              {% for r in respondents %}
-              <option value="{{ r.respondent_id }}">{{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y</option>
-              {% endfor %}
-            </select>
-            <label>Duration (seconds)</label>
-            <input type="number" name="duration_sec" value="{{ default_duration }}" min="5" max="600" />
-            <button class="btn-green" type="submit"
-              {% if active_session %}disabled title="Stop current session first"{% endif %}>
-              ▶ Start Recording
-            </button>
-          </form>
-          {% if not respondents %}
-          <div class="warn-box">
-            ⚠ No respondents yet.
-            <a href="/experiment/respondents" style="color:var(--accent);font-weight:600;">Add one →</a>
-          </div>
-          {% endif %}
-        </div>
-
-        <!-- Quick links -->
-        <div class="card">
-          <h2>Quick Links</h2>
-          <div class="links-row">
-            <a href="/experiment/respondents" class="btn btn-muted">👥 Respondents</a>
-            <a href="/experiment/sessions"    class="btn btn-muted">📋 Sessions</a>
-            <a href="/"                        class="btn btn-muted">📊 Dashboard</a>
-          </div>
-        </div>
-
+    <!-- Quick links -->
+    <div class="card">
+      <h2>Quick Links</h2>
+      <div class="links-row">
+        <a href="/experiment/respondents" class="btn btn-muted"
+          >👥 Respondents</a
+        >
+        <a href="/experiment/sessions" class="btn btn-muted">📋 Sessions</a>
+        <a href="/" class="btn btn-muted">📊 Dashboard</a>
       </div>
     </div>
+  </div>
+</div>
 
-    <script>
-      const startForm = document.querySelector("form[action='/experiment/session/start']");
-      if (startForm) {
-        startForm.addEventListener("submit", function(e) {
-          e.preventDefault();
-          const overlay = document.getElementById("countdown-overlay");
-          const numEl   = document.getElementById("countdown-number");
-          const labelEl = document.getElementById("countdown-label");
-          overlay.classList.add("show");
-          const steps = [
-            { n: "3", label: "Get ready…" },
-            { n: "2", label: "Stay still…" },
-            { n: "1", label: "Almost…" },
-            { n: "REC", label: "Recording started!" },
-          ];
-          function pop(el) { el.classList.remove("pop"); void el.offsetWidth; el.classList.add("pop"); }
-          let i = 0;
-          function tick() {
-            if (i < steps.length) {
-              numEl.textContent = steps[i].n;
-              labelEl.textContent = steps[i].label;
-              pop(numEl); i++;
-              if (i < steps.length) setTimeout(tick, 1000);
-              else setTimeout(() => startForm.submit(), 500);
-            }
-          }
-          tick();
-        });
+{% endblock %} {% block scripts %}
+<script>
+  const startForm = document.querySelector(
+    "form[action='/experiment/session/start']",
+  );
+  if (startForm) {
+    startForm.addEventListener("submit", function (e) {
+      e.preventDefault();
+      const overlay = document.getElementById("countdown-overlay");
+      const numEl = document.getElementById("countdown-number");
+      const labelEl = document.getElementById("countdown-label");
+      overlay.classList.add("show");
+      const steps = [
+        { n: "3", label: "Get ready…" },
+        { n: "2", label: "Stay still…" },
+        { n: "1", label: "Almost…" },
+        { n: "REC", label: "Recording started!" },
+      ];
+      function pop(el) {
+        el.classList.remove("pop");
+        void el.offsetWidth;
+        el.classList.add("pop");
       }
+      let i = 0;
+      function tick() {
+        if (i < steps.length) {
+          numEl.textContent = steps[i].n;
+          labelEl.textContent = steps[i].label;
+          pop(numEl);
+          i++;
+          if (i < steps.length) setTimeout(tick, 1000);
+          else setTimeout(() => startForm.submit(), 500);
+        }
+      }
+      tick();
+    });
+  }
 
-      function pollActive() {
-        fetch("/experiment/session/active").then(r => r.json()).then(s => {
-          const banner = document.getElementById("rec-banner");
-          if (!s) { banner.classList.remove("show"); return; }
-          banner.classList.add("show");
-          document.getElementById("rec-title").textContent = `REC — ${s.respondent_id} (${s.session_id})`;
-          document.getElementById("rec-sub").textContent   = `${s.elapsed_sec}s / ${s.duration_sec}s`;
-          const pct = Math.min(100, Math.round(s.elapsed_sec / s.duration_sec * 100));
-          document.getElementById("rec-bar").style.width = pct + "%";
-        }).catch(() => {});
-      }
-      setInterval(pollActive, 1000);
-    </script>
-  </body>
-</html>
+  function pollActive() {
+    fetch("/experiment/session/active")
+      .then((r) => r.json())
+      .then((s) => {
+        const banner = document.getElementById("rec-banner");
+        if (!s) {
+          banner.classList.remove("show");
+          return;
+        }
+        banner.classList.add("show");
+        document.getElementById("rec-title").textContent =
+          `REC — ${s.respondent_id} (${s.session_id})`;
+        document.getElementById("rec-sub").textContent =
+          `${s.elapsed_sec}s / ${s.duration_sec}s`;
+        const pct = Math.min(
+          100,
+          Math.round((s.elapsed_sec / s.duration_sec) * 100),
+        );
+        document.getElementById("rec-bar").style.width = pct + "%";
+      })
+      .catch(() => {});
+  }
+  setInterval(pollActive, 1000);
+</script>
+{% endblock %}

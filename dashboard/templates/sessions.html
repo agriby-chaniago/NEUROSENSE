@@ -1,131 +1,74 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=1024, initial-scale=1.0" />
-    <title>NEUROSENSE — Sessions</title>
-    <style>
-      *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-      :root {
-        --bg: #f0f4f8; --card-bg: #ffffff; --border: #d0d9e4;
-        --text: #1a2b3c; --muted: #52697e; --accent: #1a5fad;
-        --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
-        --purple: #5e35b1; --shadow: 0 1px 3px rgba(26,43,60,.1);
-      }
-      html, body { width: 1024px; }
-      body {
-        background: var(--bg); color: var(--text);
-        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 0.82rem; padding: 0.5rem 0.75rem;
-        display: flex; flex-direction: column; gap: 0.5rem; min-height: 600px;
-      }
-
-      header {
-        display: flex; align-items: center; gap: 0.75rem;
-        border-bottom: 2px solid var(--accent); padding-bottom: 0.45rem; flex-shrink: 0;
-      }
-      header h1 { font-size: 1rem; font-weight: 700; color: var(--accent); letter-spacing: -0.02em; margin-right: auto; }
-      nav { display: flex; gap: 1rem; align-items: center; }
-      nav a {
-        color: var(--muted); text-decoration: none; font-size: 0.78rem; font-weight: 500;
-        padding: .15rem 0; border-bottom: 2px solid transparent; white-space: nowrap;
-      }
-      nav a:hover { color: var(--accent); }
-      nav a.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 600; }
-
-      .card {
-        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
-        padding: 0.85rem 1rem; box-shadow: var(--shadow); flex: 1;
-      }
-      .card h2 {
-        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.7rem; color: var(--muted);
-        text-transform: uppercase; letter-spacing: .08em;
-      }
-
-      /* Stats row */
-      .stats { display: flex; gap: 0.75rem; margin-bottom: 0.85rem; flex-wrap: wrap; }
-      .stat {
-        background: #f0f4f8; border: 1px solid var(--border); border-radius: 7px;
-        padding: 0.45rem 0.85rem; font-size: .72rem; color: var(--muted); min-width: 90px;
-      }
-      .stat strong { color: var(--text); display: block; font-size: 1.25rem; font-weight: 700; line-height: 1.2; }
-
-      table { width: 100%; border-collapse: collapse; font-size: .8rem; }
-      th {
-        text-align: left; color: var(--muted); font-weight: 600; font-size: .68rem;
-        text-transform: uppercase; letter-spacing: .05em; padding: .38rem .65rem;
-        border-bottom: 2px solid var(--border); background: #f8fafc; white-space: nowrap;
-      }
-      td { padding: .45rem .65rem; border-bottom: 1px solid #eaeff5; vertical-align: middle; }
-      tr:last-child td { border-bottom: none; }
-      tr:hover td { background: #f5f8fc; }
-
-      .pill { display: inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .68rem; font-weight: 700; }
-      .pill-done        { background: #e6f4ed; color: var(--green); }
-      .pill-rec         { background: #fdecea; color: var(--red); }
-      .pill-interrupted { background: #fef3e2; color: #7a4800; }
-    </style>
-  </head>
-  <body>
-    <header>
-      <h1>NEUROSENSE</h1>
-      <nav>
-        <a href="/">Dashboard</a>
-        <a href="/experiment">Experiment</a>
-        <a href="/experiment/respondents">Respondents</a>
-        <a href="/experiment/sessions" class="active">Sessions</a>
-      </nav>
-    </header>
-
-    <div class="card">
-      <h2>Session Summary</h2>
-      <div class="stats">
-        <div class="stat">
-          <strong>{{ sessions|length }}</strong> Total Sessions
-        </div>
-        <div class="stat">
-          <strong>{{ sessions|selectattr('status','equalto','done')|list|length }}</strong> Completed
-        </div>
-        <div class="stat">
-          <strong>{{ sessions|map(attribute='respondent_id')|unique|list|length }}</strong> Respondents
-        </div>
-      </div>
-
-      {% if sessions %}
-      <table>
-        <thead>
-          <tr>
-            <th>Session</th>
-            <th>Respondent</th>
-            <th>Duration</th>
-            <th>Frames</th>
-            <th>Sensor Rows</th>
-            <th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for s in sessions %}
-          <tr>
-            <td><strong>{{ s.session_id }}</strong></td>
-            <td>{{ s.respondent_id }}</td>
-            <td>{{ s.duration_sec }}s</td>
-            <td>{{ s.frame_count }}</td>
-            <td>{{ s.sensor_rows }}</td>
-            <td>
-              <span class="pill {% if s.status=='done' %}pill-done{% elif s.status=='interrupted' %}pill-interrupted{% else %}pill-rec{% endif %}">
-                {{ s.status }}
-              </span>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
-      {% else %}
-      <p style="color:var(--muted);font-size:.82rem;padding:.75rem 0">
-        No sessions recorded yet.
-        <a href="/experiment" style="color:var(--accent);font-weight:600;">Start one →</a>
-      </p>
-      {% endif %}
+{% extends "base.html" %} {% block title %}NEUROSENSE — Sessions{% endblock %}
+{% block extra_style %} /* Sessions — scrollable at 1024px, min 600px tall */
+body { min-height: 600px; } .card { flex: 1; } /* Stats row */ .stats { display:
+flex; gap: 0.75rem; margin-bottom: 0.85rem; flex-wrap: wrap; } .stat {
+background: #f0f4f8; border: 1px solid var(--border); border-radius: 7px;
+padding: 0.45rem 0.85rem; font-size: .72rem; color: var(--muted); min-width:
+90px; } .stat strong { color: var(--text); display: block; font-size: 1.25rem;
+font-weight: 700; line-height: 1.2; } /* Status pills */ .pill { display:
+inline-block; padding: .15rem .5rem; border-radius: 10px; font-size: .68rem;
+font-weight: 700; } .pill-done { background: #e6f4ed; color: var(--green); }
+.pill-rec { background: #fdecea; color: var(--red); } .pill-interrupted {
+background: #fef3e2; color: #7a4800; } {% endblock %} {% block content %}
+<div class="card">
+  <h2>Session Summary</h2>
+  <div class="stats">
+    <div class="stat">
+      <strong>{{ sessions|length }}</strong> Total Sessions
     </div>
-  </body>
-</html>
+    <div class="stat">
+      <strong
+        >{{ sessions|selectattr('status','equalto','done')|list|length
+        }}</strong
+      >
+      Completed
+    </div>
+    <div class="stat">
+      <strong
+        >{{ sessions|map(attribute='respondent_id')|unique|list|length
+        }}</strong
+      >
+      Respondents
+    </div>
+  </div>
+
+  {% if sessions %}
+  <table>
+    <thead>
+      <tr>
+        <th>Session</th>
+        <th>Respondent</th>
+        <th>Duration</th>
+        <th>Frames</th>
+        <th>Sensor Rows</th>
+        <th>Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for s in sessions %}
+      <tr>
+        <td><strong>{{ s.session_id }}</strong></td>
+        <td>{{ s.respondent_id }}</td>
+        <td>{{ s.duration_sec }}s</td>
+        <td>{{ s.frame_count }}</td>
+        <td>{{ s.sensor_rows }}</td>
+        <td>
+          <span
+            class="pill {% if s.status=='done' %}pill-done{% elif s.status=='interrupted' %}pill-interrupted{% else %}pill-rec{% endif %}"
+          >
+            {{ s.status }}
+          </span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <p style="color: var(--muted); font-size: 0.82rem; padding: 0.75rem 0">
+    No sessions recorded yet.
+    <a href="/experiment" style="color: var(--accent); font-weight: 600"
+      >Start one →</a
+    >
+  </p>
+  {% endif %} {% endblock %}
+</div>
