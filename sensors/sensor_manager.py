@@ -33,11 +33,22 @@ class SensorManager:
         self._lock = threading.Lock()
         self._threads: list[threading.Thread] = []
         self._buzzer = Buzzer()
+        # Track consecutive read failures per sensor to detect disconnects.
+        # After _SENSOR_ERROR_THRESHOLD consecutive exceptions, a sensor_error
+        # key is injected into latest_data → triggers buzzer disconnect alert.
+        self._sensor_error_counts: dict[str, int] = {}
+        self._SENSOR_ERROR_THRESHOLD = 5
+        # Monotonic time of SensorManager construction — used to suppress
+        # sensor_error alerts during the startup grace period (I2C bus needs
+        # a few seconds to stabilise after boot before reads are reliable).
+        self._start_mono: float = time.monotonic()
+        self._STARTUP_GRACE_S = 20.0  # seconds to suppress sensor_error buzzer
 
         # Initialised with sentinel Nones — dashboard can detect "not yet read"
         self.latest_data: dict[str, Any] = {k: None for k in config.CSV_FIELDNAMES}
         self.latest_data["alert_active"]  = False
         self.latest_data["alert_reasons"] = ""
+        self.latest_data["sensor_error"]  = None  # cleared by default; set on disconnect
 
         # Monotonic timestamp of the last successful sensor _update().
         # Used to detect sensor dropout: >5s without update = stale.
@@ -142,9 +153,35 @@ class SensorManager:
             start = time.monotonic()
             try:
                 data = reader.read()
+                # Reset error counter on successful read
+                if self._sensor_error_counts.get(name, 0) > 0:
+                    logger.info("Sensor '%s' recovered after %d consecutive errors",
+                                name, self._sensor_error_counts[name])
+                    self._sensor_error_counts[name] = 0
+                    self._update({"sensor_error": None})  # clear error flag
                 self._update(data)
             except Exception as exc:
                 logger.error("Sensor '%s' unhandled read error: %s", name, exc)
+                count = self._sensor_error_counts.get(name, 0) + 1
+                self._sensor_error_counts[name] = count
+                # Only act when threshold is crossed for the first time (==),
+                # NOT on every subsequent failure (>= would re-inject every loop
+                # iteration and cause non-stop buzzing with interval=0 sensors).
+                if count == self._SENSOR_ERROR_THRESHOLD:
+                    uptime = time.monotonic() - self._start_mono
+                    if uptime < self._STARTUP_GRACE_S:
+                        # I2C bus not yet stable — log but don't alert
+                        logger.warning(
+                            "Sensor '%s' failed %d times but still in startup "
+                            "grace period (%.0fs / %.0fs) — alert suppressed",
+                            name, count, uptime, self._STARTUP_GRACE_S,
+                        )
+                    else:
+                        logger.error(
+                            "Sensor '%s' has failed %d consecutive times — "
+                            "suspected disconnect", name, count,
+                        )
+                        self._update({"sensor_error": f"{name}_disconnected"})
 
             elapsed = time.monotonic() - start
             sleep_time = max(0.0, interval - elapsed)

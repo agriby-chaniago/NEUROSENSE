@@ -5,11 +5,15 @@ Hardware: Active buzzer (HIGH = ON) connected to D5 port on Grove Base HAT.
 D5 port = GPIO 5 on Raspberry Pi.
 Uses lgpio (Pi 5 compatible — replaces RPi.GPIO).
 
-Alert conditions checked:
-  - Heart Rate > ALERT_HR_HIGH or < ALERT_HR_LOW
-  - SpO2 < ALERT_SPO2_LOW
-  - GSR conductance > ALERT_GSR_HIGH_US
-  - Sensor disconnect (sensor_error)
+Alert conditions and beep patterns:
+  - SpO2 < ALERT_SPO2_LOW         → 3 short beeps        (most urgent)
+  - HR > ALERT_HR_HIGH            → 2 fast beeps          (tachycardia)
+  - HR < ALERT_HR_LOW             → 2 slow beeps          (bradycardia)
+  - GSR > ALERT_GSR_HIGH_US       → 1 long beep           (stress)
+  - sensor_error in data          → 1 long + 1 short beep (hardware fault)
+
+Each condition has its own independent cooldown — a GSR alert will not
+suppress a simultaneous SpO2 alert.
 """
 
 import logging
@@ -38,7 +42,9 @@ class Buzzer:
         self._gpio_handle = None
         self._pin = config.BUZZER_GPIO_PIN
         self._enabled = config.BUZZER_ENABLED
-        self._last_alert_time: float = 0.0
+        # Per-condition cooldown: each key has its own last-fired timestamp.
+        # Prevents one condition from suppressing another during cooldown.
+        self._last_alert_time: dict[str, float] = {}
         self._lock = threading.Lock()   # prevent concurrent beep calls
         self._active = False            # is buzzer currently ON?
 
@@ -85,7 +91,8 @@ class Buzzer:
     def check_and_alert(self, data: dict[str, Any]) -> tuple[bool, list[str]]:
         """
         Evaluate latest sensor data against alert thresholds.
-        Triggers the buzzer if any threshold is exceeded and cooldown has passed.
+        Each condition fires independently — one alert will not suppress
+        another during its cooldown window.
 
         Parameters
         ----------
@@ -100,73 +107,96 @@ class Buzzer:
         """
         reasons = []
 
+        # ── SpO2 (highest priority — check first) ─────────────────────────
+        spo2 = data.get("spo2_percent")
+        spo2_valid = data.get("spo2_valid", False)
+        if spo2 is not None and spo2_valid:
+            if config.ALERT_SPO2_LOW and spo2 < config.ALERT_SPO2_LOW:
+                reasons.append(f"SPO2_LOW:{spo2:.1f}%<{config.ALERT_SPO2_LOW}")
+                self._maybe_beep(
+                    "SPO2",
+                    durations=[config.BUZZER_SHORT_BEEP_S] * 3,
+                    gap=0.1,
+                )
+
         # ── Heart Rate ────────────────────────────────────────────────────
         hr = data.get("heart_rate_bpm")
         hr_valid = data.get("hr_valid", False)
         if hr is not None and hr_valid:
             if config.ALERT_HR_HIGH and hr > config.ALERT_HR_HIGH:
                 reasons.append(f"HR_HIGH:{hr:.0f}bpm>{config.ALERT_HR_HIGH}")
+                self._maybe_beep(
+                    "HR_HIGH",
+                    durations=[config.BUZZER_SHORT_BEEP_S] * 2,
+                    gap=0.08,   # fast gap — tachycardia urgency
+                )
             if config.ALERT_HR_LOW and hr < config.ALERT_HR_LOW:
                 reasons.append(f"HR_LOW:{hr:.0f}bpm<{config.ALERT_HR_LOW}")
-
-        # ── SpO2 ──────────────────────────────────────────────────────────
-        spo2 = data.get("spo2_percent")
-        spo2_valid = data.get("spo2_valid", False)
-        if spo2 is not None and spo2_valid:
-            if config.ALERT_SPO2_LOW and spo2 < config.ALERT_SPO2_LOW:
-                reasons.append(f"SPO2_LOW:{spo2:.1f}%<{config.ALERT_SPO2_LOW}")
+                self._maybe_beep(
+                    "HR_LOW",
+                    durations=[config.BUZZER_SHORT_BEEP_S] * 2,
+                    gap=0.40,   # slow gap — bradycardia rhythm
+                )
 
         # ── GSR ───────────────────────────────────────────────────────────
         gsr = data.get("gsr_conductance_us")
         if gsr is not None:
             if config.ALERT_GSR_HIGH_US and gsr > config.ALERT_GSR_HIGH_US:
                 reasons.append(f"GSR_HIGH:{gsr:.2f}uS>{config.ALERT_GSR_HIGH_US}")
+                self._maybe_beep(
+                    "GSR",
+                    durations=[config.BUZZER_LONG_BEEP_S],
+                    gap=0,
+                )
 
-        # ── Trigger buzzer ────────────────────────────────────────────────
+        # ── Sensor disconnect / hardware error ────────────────────────────
+        sensor_error = data.get("sensor_error")
+        if sensor_error:
+            reasons.append(f"SENSOR_ERROR:{sensor_error}")
+            # 1 long + 1 short: clearly distinguishable from other patterns
+            self._maybe_beep(
+                "SENSOR_ERROR",
+                durations=[config.BUZZER_LONG_BEEP_S, config.BUZZER_SHORT_BEEP_S],
+                gap=0.15,
+            )
+
         alert_active = len(reasons) > 0
-        if alert_active:
-            self._trigger(reasons)
-
         return alert_active, reasons
 
-    # ── Buzzer patterns ───────────────────────────────────────────────────
+    # ── Beep logic ────────────────────────────────────────────────────────
 
-    def _trigger(self, reasons: list[str]):
+    def _maybe_beep(self, key: str, durations: list[float], gap: float):
         """
-        Sound the buzzer if cooldown has passed.
-        Pattern depends on severity:
-          - SpO2 low          → 3 short beeps (urgent)
-          - HR out of range   → 2 short beeps
-          - GSR high          → 1 long beep
+        Fire beep sequence only if this condition's cooldown has expired.
+        Each condition key has an independent timer — SPO2 cooldown does
+        not block HR_HIGH from firing at the same time.
+
+        Parameters
+        ----------
+        key       : condition name — one of SPO2 / HR_HIGH / HR_LOW / GSR / SENSOR_ERROR
+        durations : list of on-times (seconds) for each beep in the sequence
+        gap       : silence between beeps (seconds)
         """
         now = time.monotonic()
         with self._lock:
-            if (now - self._last_alert_time) < config.BUZZER_COOLDOWN_S:
-                return   # still in cooldown
-            self._last_alert_time = now
+            if (now - self._last_alert_time.get(key, 0.0)) < config.BUZZER_COOLDOWN_S:
+                return  # this condition is still in cooldown
+            self._last_alert_time[key] = now
 
-        logger.warning("ALERT triggered: %s", ", ".join(reasons))
+        logger.warning("ALERT [%s]: %d beep(s)", key, len(durations))
+        self._beep_sequence(durations, gap)
 
-        # Choose pattern based on most severe condition
-        if any("SPO2_LOW" in r for r in reasons):
-            self._beep_pattern(count=3, on_time=config.BUZZER_SHORT_BEEP_S, gap=0.1)
-        elif any("HR_" in r for r in reasons):
-            self._beep_pattern(count=2, on_time=config.BUZZER_SHORT_BEEP_S, gap=0.1)
-        else:
-            self._beep_pattern(count=1, on_time=config.BUZZER_LONG_BEEP_S, gap=0)
-
-    def _beep_pattern(self, count: int, on_time: float, gap: float):
-        """Sound the buzzer `count` times in a background thread."""
-        def _beep():
-            for i in range(count):
+    def _beep_sequence(self, durations: list[float], gap: float):
+        """Sound the buzzer with a variable-length sequence in a background thread."""
+        def _play():
+            for i, on_time in enumerate(durations):
                 self._set_pin(True)
                 time.sleep(on_time)
                 self._set_pin(False)
-                if gap > 0 and i < count - 1:
+                if gap > 0 and i < len(durations) - 1:
                     time.sleep(gap)
 
-        t = threading.Thread(target=_beep, daemon=True)
-        t.start()
+        threading.Thread(target=_play, daemon=True).start()
 
     def _set_pin(self, state: bool):
         """Set buzzer GPIO pin HIGH (on) or LOW (off)."""
@@ -182,6 +212,6 @@ class Buzzer:
     # ── Manual test ───────────────────────────────────────────────────────
 
     def test_beep(self):
-        """Single short beep — call after setup() to verify buzzer works."""
+        """Two short beeps — call after setup() to verify buzzer works."""
         logger.info("Buzzer test beep...")
-        self._beep_pattern(count=2, on_time=0.05, gap=0.05)
+        self._beep_sequence([0.05, 0.05], gap=0.05)
