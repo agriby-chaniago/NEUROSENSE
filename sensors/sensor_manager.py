@@ -38,6 +38,10 @@ class SensorManager:
         # key is injected into latest_data → triggers buzzer disconnect alert.
         self._sensor_error_counts: dict[str, int] = {}
         self._SENSOR_ERROR_THRESHOLD = 5
+        # Set of sensor names currently believed to be disconnected.
+        # Using a set prevents multiple simultaneous errors from masking each
+        # other — recovery of one sensor won't clear another's active error.
+        self._active_sensor_errors: set[str] = set()
         # Monotonic time of SensorManager construction — used to suppress
         # sensor_error alerts during the startup grace period (I2C bus needs
         # a few seconds to stabilise after boot before reads are reliable).
@@ -158,7 +162,10 @@ class SensorManager:
                     logger.info("Sensor '%s' recovered after %d consecutive errors",
                                 name, self._sensor_error_counts[name])
                     self._sensor_error_counts[name] = 0
-                    self._update({"sensor_error": None})  # clear error flag
+                    # Remove from active errors set and push updated state.
+                    # Other sensors' errors remain in the set unaffected.
+                    self._active_sensor_errors.discard(name)
+                    self._push_error_state()
                 self._update(data)
             except Exception as exc:
                 logger.error("Sensor '%s' unhandled read error: %s", name, exc)
@@ -181,7 +188,8 @@ class SensorManager:
                             "Sensor '%s' has failed %d consecutive times — "
                             "suspected disconnect", name, count,
                         )
-                        self._update({"sensor_error": f"{name}_disconnected"})
+                        self._active_sensor_errors.add(name)
+                        self._push_error_state()
 
             elapsed = time.monotonic() - start
             sleep_time = max(0.0, interval - elapsed)
@@ -213,7 +221,16 @@ class SensorManager:
         self._csv_logger.log(snapshot)
 
     # ── Health ───────────────────────────────────────────────────────────
+    def _push_error_state(self):
+        """
+        Rebuild the sensor_error string from the current set of active errors
+        and push it into latest_data via _update.
 
+        Using a set means two sensors can be disconnected simultaneously without
+        masking each other, and recovering one sensor doesn't clear the other.
+        """
+        error_str = ", ".join(sorted(self._active_sensor_errors)) or None
+        self._update({"sensor_error": error_str})
     def health(self) -> list[dict]:
         """Return health dicts for all registered sensors."""
         return [entry["reader"].health() for entry in self._sensors.values()]

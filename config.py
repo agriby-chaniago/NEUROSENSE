@@ -104,6 +104,7 @@ CSV_FIELDNAMES = [
     # ── Alerts ──
     "alert_active",         # True jika ada kondisi bahaya saat pembacaan ini
     "alert_reasons",        # deskripsi kondisi bahaya, dipisah koma
+    "sensor_error",         # nama sensor yang disconnect (None jika semua OK)
 ]
 
 # ─── Dashboard ─────────────────────────────────────────────────────────────

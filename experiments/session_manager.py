@@ -44,7 +44,9 @@ logger = logging.getLogger(__name__)
 SESSION_SENSOR_FIELDS = [
     "timestamp_ms",
     "heart_rate_bpm",
+    "hr_valid",          # bool — False means value is stale/invalid; exclude from analysis
     "spo2_percent",
+    "spo2_valid",        # bool — False means value is stale/invalid; exclude from analysis
     "temperature_celsius",
     "gsr_raw_adc",
     "gsr_conductance_us",
@@ -262,7 +264,9 @@ class SessionManager:
                 row  = {
                     "timestamp_ms":        int(time.time() * 1000),  # Unix epoch ms
                     "heart_rate_bpm":      data.get("heart_rate_bpm"),
+                    "hr_valid":            data.get("hr_valid"),
                     "spo2_percent":        data.get("spo2_percent"),
+                    "spo2_valid":          data.get("spo2_valid"),
                     "temperature_celsius": data.get("temperature_celsius"),
                     "gsr_raw_adc":         data.get("gsr_raw_adc"),
                     "gsr_conductance_us":  data.get("gsr_conductance_us"),

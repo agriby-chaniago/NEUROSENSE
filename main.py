@@ -11,6 +11,7 @@ Open the dashboard at:  http://<pi-ip>:5000
 
 import argparse
 import logging
+import logging.handlers
 import signal
 import sys
 import time
@@ -28,12 +29,19 @@ from experiments.respondent_registry import RespondentRegistry
 def setup_logging(debug: bool = False):
     level = logging.DEBUG if debug else logging.INFO
     fmt   = "%(asctime)s  %(levelname)-8s  %(name)-30s  %(message)s"
+    # Rotate at 5 MB, keep 5 backups (25 MB total) — prevents SD card filling up
+    file_handler = logging.handlers.RotatingFileHandler(
+        "neurosense.log",
+        maxBytes=5 * 1024 * 1024,  # 5 MB
+        backupCount=5,
+        encoding="utf-8",
+    )
     logging.basicConfig(
         level=level,
         format=fmt,
         handlers=[
             logging.StreamHandler(sys.stdout),
-            logging.FileHandler("neurosense.log", encoding="utf-8"),
+            file_handler,
         ],
     )
     # Suppress noisy Flask/Werkzeug logs unless in debug mode
