@@ -135,9 +135,7 @@ def create_app(
                         b"Content-Type: image/jpeg\r\n\r\n"
                         + frame
                         + b"\r\n"
-                    )
-                    # get_new_frame() already waited for THIS frame to be new —
-                    # immediately loop back so we never sleep between frames.
+                )
 
         return Response(
             generate(),
