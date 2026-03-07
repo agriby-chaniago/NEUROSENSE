@@ -12,11 +12,13 @@
         --green: #1e7845; --red: #b71c1c; --yellow: #c25d00;
         --purple: #5e35b1; --shadow: 0 1px 3px rgba(26,43,60,.1);
       }
-      html, body { width: 1024px; }
+
+      html, body { width: 1024px; height: 600px; overflow: hidden; }
+
       body {
         background: var(--bg); color: var(--text);
         font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-        font-size: 0.82rem; padding: 0.5rem 0.75rem; min-height: 600px;
+        font-size: 0.82rem; padding: 0.5rem 0.75rem;
         display: flex; flex-direction: column; gap: 0.5rem;
       }
 
@@ -38,7 +40,7 @@
       #rec-banner {
         display: none; align-items: center; gap: 0.6rem;
         background: #fdecea; border: 1px solid #e8a09a; border-left: 4px solid var(--red);
-        border-radius: 7px; padding: 0.6rem 0.85rem; flex-shrink: 0;
+        border-radius: 7px; padding: 0.5rem 0.85rem; flex-shrink: 0;
       }
       #rec-banner.show { display: flex; }
       #rec-dot {
@@ -47,54 +49,76 @@
       }
       @keyframes blink { 50% { opacity: 0; } }
       #rec-info { flex: 1; }
-      #rec-info strong { font-size: 0.88rem; color: var(--red); }
-      #rec-info small { color: var(--muted); font-size: 0.72rem; display: block; margin-top: 0.1rem; }
-      #rec-bar-wrap { width: 100%; height: 4px; background: #f0d0cf; border-radius: 2px; margin-top: 0.4rem; }
+      #rec-info strong { font-size: 0.85rem; color: var(--red); }
+      #rec-info small { color: var(--muted); font-size: 0.7rem; display: block; margin-top: 0.1rem; }
+      #rec-bar-wrap { width: 100%; height: 4px; background: #f0d0cf; border-radius: 2px; margin-top: 0.3rem; }
       #rec-bar { width: 0%; height: 4px; background: var(--red); border-radius: 2px; transition: width .5s; }
 
-      /* Main 2-column layout */
-      .main-grid {
-        display: grid; grid-template-columns: 1fr 1fr; gap: 0.65rem; flex: 1;
+      /* Main 2-column layout: camera left, controls right */
+      .main-layout {
+        display: grid; grid-template-columns: 390px 1fr; gap: 0.6rem;
+        flex: 1; min-height: 0;
       }
+
+      /* Left: Camera */
+      .left-col { display: flex; flex-direction: column; min-height: 0; }
+      .camera-card {
+        background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
+        padding: 0.55rem 0.7rem 0.5rem; box-shadow: var(--shadow);
+        display: flex; flex-direction: column; flex: 1; min-height: 0;
+      }
+      .camera-card h3 {
+        font-size: 0.68rem; color: var(--muted); text-transform: uppercase;
+        letter-spacing: 0.07em; font-weight: 600; margin-bottom: 0.4rem; flex-shrink: 0;
+      }
+      .camera-wrap {
+        position: relative; flex: 1; min-height: 0;
+        border-radius: 5px; border: 1px solid var(--border); overflow: hidden;
+      }
+      .camera-wrap img { width: 100%; height: 100%; object-fit: cover; display: block; }
+      #cam-err { display: none; color: var(--muted); font-size: .78rem; padding: .5rem; }
+
+      /* Right: Controls */
+      .right-col { display: flex; flex-direction: column; gap: 0.5rem; min-height: 0; }
 
       /* Cards */
       .card {
         background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px;
-        padding: 0.85rem 1rem; box-shadow: var(--shadow);
+        padding: 0.75rem 0.9rem; box-shadow: var(--shadow);
       }
       .card h2 {
-        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.75rem; color: var(--muted);
+        font-size: 0.65rem; font-weight: 700; margin-bottom: 0.65rem; color: var(--muted);
         text-transform: uppercase; letter-spacing: .08em;
       }
-      label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 0.25rem; }
+
+      label { display: block; font-size: 0.72rem; font-weight: 600; color: var(--muted); margin-bottom: 0.22rem; }
       select, input {
-        width: 100%; padding: 0.4rem 0.65rem; background: #f8fafc; border: 1px solid var(--border);
-        border-radius: 5px; color: var(--text); font-size: 0.82rem; margin-bottom: 0.6rem; transition: border-color .15s;
+        width: 100%; padding: 0.38rem 0.6rem; background: #f8fafc; border: 1px solid var(--border);
+        border-radius: 5px; color: var(--text); font-size: 0.82rem; margin-bottom: 0.5rem; transition: border-color .15s;
       }
       select:focus, input:focus { outline: none; border-color: var(--accent); background: #fff; }
+
       button, .btn {
-        padding: 0.45rem 1rem; border: none; border-radius: 5px;
+        padding: 0.42rem 0.95rem; border: none; border-radius: 5px;
         font-size: 0.82rem; font-weight: 600; cursor: pointer; letter-spacing: .01em;
       }
       .btn-green { background: var(--green); color: #fff; }
       .btn-red   { background: var(--red);   color: #fff; }
-      .btn-accent { background: var(--accent); color: #fff; }
-      .btn-muted { background: #f0f4f8; color: var(--text); border: 1px solid var(--border); text-decoration: none; }
+      .btn-muted {
+        background: #f0f4f8; color: var(--text); border: 1px solid var(--border);
+        text-decoration: none; display: inline-block; text-align: center;
+      }
       .btn-muted:hover { background: #e4eaf1; }
       button:disabled { opacity: .4; cursor: not-allowed; }
 
-      .pill { display: inline-block; padding: .16rem .5rem; border-radius: 10px; font-size: .7rem; font-weight: 700; }
-      .pill-green  { background: #e6f4ed; color: var(--green); }
-      .pill-red    { background: #fdecea; color: var(--red); }
-      .pill-yellow { background: #fef3e2; color: var(--yellow); }
+      /* Links row */
+      .links-row { display: flex; gap: 0.5rem; flex-wrap: wrap; }
 
-      /* Camera in right card */
-      .cam-card { display: flex; flex-direction: column; }
-      .cam-card .cam-wrap { flex: 1; min-height: 0; position: relative; background: var(--card-bg); border-radius: 5px; border: 1px solid var(--border); overflow: hidden; }
-      .cam-card img { width: 100%; height: 100%; object-fit: cover; display: block; }
-
-      /* Quick links */
-      .links-row { display: flex; gap: 0.6rem; flex-wrap: wrap; }
+      /* No respondents warning */
+      .warn-box {
+        color: var(--yellow); font-size: .75rem; margin-top: .5rem;
+        background: #fef3e2; padding: .4rem .6rem; border-radius: 5px; border-left: 3px solid var(--yellow);
+      }
 
       /* Countdown overlay */
       #countdown-overlay {
@@ -115,6 +139,7 @@
       <div id="countdown-label">Get ready…</div>
     </div>
 
+    <!-- Header -->
     <header>
       <h1>NEUROSENSE</h1>
       <nav>
@@ -129,69 +154,71 @@
     <div id="rec-banner" {% if active_session %}class="show" {% endif %}>
       <div id="rec-dot"></div>
       <div id="rec-info">
-        <strong id="rec-title">
-          {% if active_session %}REC — {{ active_session.respondent_id }} ({{ active_session.session_id }}){% endif %}
-        </strong>
-        <small id="rec-sub">
-          {% if active_session %}{{ active_session.elapsed_sec }}s / {{ active_session.duration_sec }}s{% endif %}
-        </small>
+        <strong id="rec-title">{% if active_session %}REC — {{ active_session.respondent_id }} ({{ active_session.session_id }}){% endif %}</strong>
+        <small id="rec-sub">{% if active_session %}{{ active_session.elapsed_sec }}s / {{ active_session.duration_sec }}s{% endif %}</small>
         <div id="rec-bar-wrap">
-          <div id="rec-bar"
-            {% if active_session %}style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"{% endif %}
-          ></div>
+          <div id="rec-bar" {% if active_session %}style="width:{{ [(active_session.elapsed_sec / active_session.duration_sec * 100)|round|int, 100]|min }}%"{% endif %}></div>
         </div>
       </div>
       <form method="POST" action="/experiment/session/stop" style="margin:0">
-        <button class="btn-red" type="submit">Stop</button>
+        <button class="btn-red" type="submit">■ Stop</button>
       </form>
     </div>
 
-    <!-- Main grid: form + camera -->
-    <div class="main-grid">
-      <!-- Start Session -->
-      <div class="card">
-        <h2>Start New Session</h2>
-        <form method="POST" action="/experiment/session/start">
-          <label>Respondent</label>
-          <select name="respondent_id" required>
-            <option value="">— select —</option>
-            {% for r in respondents %}
-            <option value="{{ r.respondent_id }}">{{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y</option>
-            {% endfor %}
-          </select>
-          <label>Duration (seconds)</label>
-          <input type="number" name="duration_sec" value="{{ default_duration }}" min="5" max="600" />
-          <button class="btn-green" type="submit"
-            {% if active_session %}disabled title="Stop current session first"{% endif %}>
-            ▶ Start Recording
-          </button>
-        </form>
-        {% if not respondents %}
-        <p style="color:var(--yellow);font-size:.78rem;margin-top:.65rem;background:#fef3e2;padding:.45rem .65rem;border-radius:5px;border-left:3px solid var(--yellow);">
-          ⚠ No respondents yet.
-          <a href="/experiment/respondents" style="color:var(--accent);font-weight:600;">Add one →</a>
-        </p>
-        {% endif %}
-      </div>
+    <!-- Main layout -->
+    <div class="main-layout">
 
-      <!-- Live camera -->
-      <div class="card cam-card">
-        <h2>Live Camera</h2>
-        <div class="cam-wrap">
-          <img src="/camera/stream" alt="camera stream"
-            onerror="this.closest('.cam-wrap').style.background='#e8ecf0'; document.getElementById('cam-err').style.display='block';" />
+      <!-- LEFT: Camera -->
+      <div class="left-col">
+        <div class="camera-card">
+          <h3>&#127909; Live Camera</h3>
+          <div class="camera-wrap">
+            <img src="/camera/stream" alt="camera stream"
+              onerror="document.getElementById('cam-err').style.display='block'; this.style.display='none';" />
+            <p id="cam-err">Camera not available.</p>
+          </div>
         </div>
-        <p id="cam-err" style="display:none;color:var(--muted);font-size:.78rem;margin-top:.4rem;">Camera not available.</p>
       </div>
-    </div>
 
-    <!-- Quick links -->
-    <div class="card">
-      <h2>Quick Links</h2>
-      <div class="links-row">
-        <a href="/experiment/respondents" class="btn btn-muted" style="text-decoration:none;">👥 Manage Respondents</a>
-        <a href="/experiment/sessions"   class="btn btn-muted" style="text-decoration:none;">📋 All Sessions</a>
-        <a href="/"                       class="btn btn-muted" style="text-decoration:none;">📊 Sensor Dashboard</a>
+      <!-- RIGHT: Controls -->
+      <div class="right-col">
+
+        <!-- Start Session -->
+        <div class="card">
+          <h2>Start New Session</h2>
+          <form method="POST" action="/experiment/session/start">
+            <label>Respondent</label>
+            <select name="respondent_id" required>
+              <option value="">— select —</option>
+              {% for r in respondents %}
+              <option value="{{ r.respondent_id }}">{{ r.respondent_id }} — {{ r.gender }}, {{ r.age }}y</option>
+              {% endfor %}
+            </select>
+            <label>Duration (seconds)</label>
+            <input type="number" name="duration_sec" value="{{ default_duration }}" min="5" max="600" />
+            <button class="btn-green" type="submit"
+              {% if active_session %}disabled title="Stop current session first"{% endif %}>
+              ▶ Start Recording
+            </button>
+          </form>
+          {% if not respondents %}
+          <div class="warn-box">
+            ⚠ No respondents yet.
+            <a href="/experiment/respondents" style="color:var(--accent);font-weight:600;">Add one →</a>
+          </div>
+          {% endif %}
+        </div>
+
+        <!-- Quick links -->
+        <div class="card">
+          <h2>Quick Links</h2>
+          <div class="links-row">
+            <a href="/experiment/respondents" class="btn btn-muted">👥 Respondents</a>
+            <a href="/experiment/sessions"    class="btn btn-muted">📋 Sessions</a>
+            <a href="/"                        class="btn btn-muted">📊 Dashboard</a>
+          </div>
+        </div>
+
       </div>
     </div>
 
@@ -237,7 +264,6 @@
         }).catch(() => {});
       }
       setInterval(pollActive, 1000);
-
     </script>
   </body>
 </html>
