@@ -232,6 +232,28 @@ class SessionManager:
         with open(meta_file, encoding="utf-8") as f:
             return json.load(f)
 
+    def delete_session(self, session_id: str) -> bool:
+        """
+        Permanently delete a session directory and all its data.
+
+        Returns True if deleted, False if not found.
+        Raises RuntimeError if the session is currently active/recording.
+        """
+        with self._lock:
+            if self._active and self._active["metadata"]["session_id"] == session_id:
+                raise RuntimeError(
+                    f"Cannot delete session {session_id} — it is currently recording."
+                )
+
+        session_dir = self._sessions_dir / session_id
+        if not session_dir.is_dir():
+            return False
+
+        import shutil as _shutil
+        _shutil.rmtree(session_dir)
+        logger.info("Session %s deleted.", session_id)
+        return True
+
     # ─── Recording threads ────────────────────────────────────────────────
 
     def _sensor_loop(

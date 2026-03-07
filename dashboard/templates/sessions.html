@@ -42,11 +42,12 @@ background: #fef3e2; color: #7a4800; } {% endblock %} {% block content %}
         <th>Frames</th>
         <th>Sensor Rows</th>
         <th>Status</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
       {% for s in sessions %}
-      <tr>
+      <tr id="row-{{ s.session_id }}">
         <td><strong>{{ s.session_id }}</strong></td>
         <td>{{ s.respondent_id }}</td>
         <td>{{ s.duration_sec }}s</td>
@@ -59,6 +60,24 @@ background: #fef3e2; color: #7a4800; } {% endblock %} {% block content %}
             {{ s.status }}
           </span>
         </td>
+        <td>
+          <button
+            class="btn-delete"
+            data-id="{{ s.session_id }}"
+            title="Hapus sesi"
+            style="
+              background: none;
+              border: 1px solid #e57373;
+              color: #e57373;
+              border-radius: 5px;
+              padding: 0.2rem 0.55rem;
+              font-size: 0.72rem;
+              cursor: pointer;
+            "
+          >
+            Hapus
+          </button>
+        </td>
       </tr>
       {% endfor %}
     </tbody>
@@ -70,5 +89,37 @@ background: #fef3e2; color: #7a4800; } {% endblock %} {% block content %}
       >Start one →</a
     >
   </p>
-  {% endif %} {% endblock %}
+  {% endif %}
 </div>
+{% endblock %} {% block scripts %}
+<script>
+  document.querySelectorAll(".btn-delete").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      var id = this.dataset.id;
+      if (
+        !confirm(
+          "Hapus sesi " +
+            id +
+            "?\nSemua data termasuk video dan CSV akan dihapus permanen.",
+        )
+      )
+        return;
+      fetch("/experiment/session/" + id, { method: "DELETE" })
+        .then(function (r) {
+          return r.json();
+        })
+        .then(function (data) {
+          if (data.status === "ok") {
+            var row = document.getElementById("row-" + id);
+            if (row) row.remove();
+          } else {
+            alert("Gagal menghapus: " + (data.message || data.status));
+          }
+        })
+        .catch(function (e) {
+          alert("Error: " + e);
+        });
+    });
+  });
+</script>
+{% endblock %}

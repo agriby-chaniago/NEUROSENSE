@@ -262,6 +262,20 @@ def create_app(
         sessions = sm.list_sessions()
         return render_template("sessions.html", sessions=sessions)
 
+    @app.route("/experiment/session/<session_id>", methods=["DELETE"])
+    def experiment_session_delete(session_id: str):
+        """Permanently delete a session and all its data."""
+        sm, _ = _require_sm()
+        if sm is None:
+            return jsonify({"status": "error", "message": "Module not ready"}), 503
+        try:
+            deleted = sm.delete_session(session_id)
+            if not deleted:
+                return jsonify({"status": "not_found"}), 404
+            return jsonify({"status": "ok"})
+        except RuntimeError as exc:
+            return jsonify({"status": "error", "message": str(exc)}), 400
+
     @app.route("/experiment/session/active")
     def experiment_session_active():
         """JSON: active session info (or null)."""
