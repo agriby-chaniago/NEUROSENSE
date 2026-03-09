@@ -171,6 +171,9 @@ CAMERA_STREAM_HEIGHT = 360
 # Sharpness: 1.0 = camera default, 2.0 = sharper (software sharpening via ISP)
 CAMERA_SHARPNESS     = 2.0
 
+# Brightness: 0.0 = default, range -1.0 (gelap) hingga 1.0 (terang)
+CAMERA_BRIGHTNESS    = 0.2
+
 # Autofocus: True untuk Arducam 64MP AF (OV64A40) — modul ini punya AF motorised.
 # False untuk fixed-focus (adjust lensa ring secara manual).
 CAMERA_AUTOFOCUS     = True
