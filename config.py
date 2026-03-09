@@ -161,7 +161,7 @@ CAMERA_HEIGHT        = 1080  # Satu-satunya mode sensor yang mendekati high-fps
 CAMERA_FRAMERATE     = 45    # Hardware max OV64A40 di mode ini: 45.65 fps
 CAMERA_JPEG_QUALITY  = 75     # turun sedikit agar encode tetap <22ms per frame
 CAMERA_ROTATION      = 90     # clockwise degrees: 0 / 90 / 180 / 270
-CAMERA_DEVICE_INDEX  = 0      # OpenCV fallback: index for /dev/video0 = 0
+CAMERA_DEVICE_INDEX  = 1      # OpenCV fallback: index for /dev/video1 = 1 (hdmi1)
 
 # Resolusi stream MJPEG (lores) — ISP hardware melakukan downscale, CPU tidak terbebani.
 # Untuk 45fps: 640x360 = encode ~5ms, masih aman di 22ms/frame window.
