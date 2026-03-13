@@ -201,7 +201,16 @@ class CameraReader:
         logger.info("CameraReader: libcamera detected %d camera(s): %s",
                     len(available), [c.get('Model', '?') for c in available])
 
-        cam = Picamera2()
+        requested_idx = int(getattr(config, "CAMERA_LIBCAMERA_INDEX", 0))
+        if 0 <= requested_idx < len(available):
+            cam = Picamera2(requested_idx)
+            logger.info("CameraReader: using libcamera index %d", requested_idx)
+        else:
+            cam = Picamera2(0)
+            logger.warning(
+                "CameraReader: CAMERA_LIBCAMERA_INDEX=%d invalid, fallback to index 0",
+                requested_idx,
+            )
 
         # ── Dual-stream config ────────────────────────────────────────
         # main  = full 1920×1080 — used for /camera/snapshot (high quality)

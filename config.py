@@ -156,6 +156,9 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 # To verify CSI: libcamera-hello --list-cameras
 # To verify USB: ls /dev/video*
 CAMERA_ENABLED       = True
+# Kamera ribbon dipindah ke port CSI1 (Pi 5 dual-CSI).
+# Set 0 untuk CSI0, 1 untuk CSI1.
+CAMERA_LIBCAMERA_INDEX = 1
 CAMERA_WIDTH         = 1920  # OV64A40 native mode: 1920x1080 @ max 45.65fps
 CAMERA_HEIGHT        = 1080  # Satu-satunya mode sensor yang mendekati high-fps
 CAMERA_FRAMERATE     = 45    # Hardware max OV64A40 di mode ini: 45.65 fps
