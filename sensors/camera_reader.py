@@ -192,7 +192,7 @@ class CameraReader:
         if not available:
             raise RuntimeError(
                 "No cameras detected by libcamera. "
-                "Run: libcamera-hello --list-cameras\n"
+                "Run: rpicam-hello --list-cameras\n"
                 "If empty, enable the camera overlay:\n"
                 "  sudo raspi-config → Interface Options → Camera\n"
                 "  OR add 'camera_auto_detect=1' to /boot/firmware/config.txt "

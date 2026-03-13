@@ -153,7 +153,7 @@ ALERT_GSR_HIGH_US = 20.0  # > 20 µS → level stres tinggi
 #   CSI ribbon cable (Arducam CSI) → uses picamera2 automatically   (recommended)
 #   USB Arducam → falls back to OpenCV VideoCapture (CAMERA_DEVICE_INDEX)
 #
-# To verify CSI: libcamera-hello --list-cameras
+# To verify CSI: rpicam-hello --list-cameras
 # To verify USB: ls /dev/video*
 CAMERA_ENABLED       = True
 # Kamera ribbon dipindah ke port CSI1 (Pi 5 dual-CSI).
